@@ -25,3 +25,22 @@ exports('rpstack:identity:getActiveCharacter', function(src)
   local character = RPSTACK_IDENTITY_CHARACTER.getActiveCharacter(src)
   return { ok = true, character = character }
 end)
+
+exports('rpstack:identity:getCharacterById', function(charId, cb)
+  if type(cb) ~= "function" then return end
+  if type(charId) ~= "number"
+    or charId <= 0
+    or charId ~= math.floor(charId)
+  then
+    cb({ ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED })
+    return
+  end
+
+  RPSTACK_CHARACTER_REPO.findById(charId, function(character)
+    if not character then
+      cb({ ok = false, error = RPSTACK_ERRORS.NOT_FOUND })
+      return
+    end
+    cb({ ok = true, character = character })
+  end)
+end)
