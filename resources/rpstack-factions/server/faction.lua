@@ -207,6 +207,7 @@ function RPSTACK_FACTIONS_FACTION.createFaction(payload, cb)
   local identity = exports["rpstack-identity"]
   local ok, err = pcall(function()
     identity['rpstack:identity:getCharacterById'](
+      identity,
       founderCharId,
       function(result)
         if not result or not result.ok then
