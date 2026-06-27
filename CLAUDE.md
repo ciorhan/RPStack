@@ -420,10 +420,11 @@ Rules:
 Economy uses bracket syntax to call identity exports (verified in production):
 
 ```lua
-exports['rpstack-identity']['rpstack:identity:getActiveCharacter'](src).character
+local identity = exports['rpstack-identity']
+identity['rpstack:identity:getActiveCharacter'](identity, src).character
 ```
 
-Note: this is the one place bracket syntax is used intentionally — because the export name contains colons, colon call syntax would misparse it.
+Note: namespaced exports require bracket syntax and the export proxy as the first argument. The proxy consumes that receiver before forwarding the documented arguments.
 
 ---
 
