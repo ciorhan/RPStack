@@ -2,7 +2,9 @@
 -- Never call balance mutations directly — always go through these exports.
 
 local function getChar(src)
-  return exports['rpstack-identity']['rpstack:identity:getActiveCharacter'](src).character
+  local identity = exports['rpstack-identity']
+  local result = identity['rpstack:identity:getActiveCharacter'](identity, src)
+  return result and result.character or nil
 end
 
 -- Get current balances. cb({ ok, cash, bank })
