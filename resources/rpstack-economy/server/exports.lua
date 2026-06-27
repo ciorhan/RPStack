@@ -76,4 +76,28 @@ end)
 exports('rpstack:economy:adjustCashByCharId', function(characterId, delta, reason, cb)
   RPSTACK_ECONOMY_ACCOUNTS.adjustCashByCharId(characterId, delta, reason, cb)
 end)
- 
+
+-- Transfer cash between two owner accounts with one atomic balance update.
+exports('rpstack:economy:transferCash', function(
+  fromType,
+  fromId,
+  fromAccount,
+  toType,
+  toId,
+  toAccount,
+  amount,
+  reason,
+  cb
+)
+  RPSTACK_ECONOMY_ACCOUNTS.transferCash(
+    fromType,
+    fromId,
+    fromAccount,
+    toType,
+    toId,
+    toAccount,
+    amount,
+    reason,
+    cb
+  )
+end)
