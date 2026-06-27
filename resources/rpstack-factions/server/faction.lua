@@ -58,9 +58,6 @@ local function persistFaction(
     factionType,
     description,
     function(factionId)
-      RPSTACK_LOG.debug("factions", "faction insert completed", {
-        factionId = factionId or "nil",
-      })
       if not factionId then
         cb({ ok = false, error = RPSTACK_ERRORS.CONFLICT })
         return
@@ -81,11 +78,6 @@ local function persistFaction(
         factionId,
         factionType,
         function(topRankId, ranksCreated)
-          RPSTACK_LOG.debug("factions", "rank seeding completed", {
-            factionId = factionId,
-            topRankId = topRankId or "nil",
-            ok = ranksCreated == true,
-          })
           if not ranksCreated then
             RPSTACK_LOG.error("factions", "default rank creation failed", {
               factionId = factionId,
@@ -99,10 +91,6 @@ local function persistFaction(
             founderCharId,
             topRankId,
             function(memberId)
-              RPSTACK_LOG.debug("factions", "founder membership completed", {
-                factionId = factionId,
-                memberId = memberId or "nil",
-              })
               if not memberId then
                 RPSTACK_LOG.error("factions", "founder membership failed", {
                   factionId = factionId,
@@ -120,10 +108,6 @@ local function persistFaction(
                   factionId,
                   "treasury",
                   function(result)
-                    RPSTACK_LOG.debug("factions", "treasury creation completed", {
-                      factionId = factionId,
-                      ok = result and result.ok == true,
-                    })
                     if not result or not result.ok then
                       RPSTACK_LOG.error("factions", "treasury creation failed", {
                         factionId = factionId,
@@ -168,7 +152,6 @@ local function persistFaction(
 end
 
 function RPSTACK_FACTIONS_FACTION.createFaction(payload, cb)
-  RPSTACK_LOG.debug("factions", "create request received")
   if type(cb) ~= "function" then
     RPSTACK_LOG.error("factions", "create callback missing")
     return

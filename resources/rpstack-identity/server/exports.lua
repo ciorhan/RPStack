@@ -1,3 +1,10 @@
+local function localCallback(callback)
+  if callback == nil then return nil end
+  return function(result)
+    callback(result)
+  end
+end
+
 exports('rpstack:identity:getSession', function(src)
   local session = RPSTACK_IDENTITY_SESSION.getSession(src)
   if not session then
@@ -10,15 +17,15 @@ end)
 -- Caller: exports['rpstack-identity']['rpstack:identity:getCharacters'](src, function(result) ... end)
 
 exports('rpstack:identity:getCharacters', function(src, cb)
-  RPSTACK_IDENTITY_CHARACTER.getCharacters(src, cb)
+  RPSTACK_IDENTITY_CHARACTER.getCharacters(src, localCallback(cb))
 end)
 
 exports('rpstack:identity:createCharacter', function(src, payload, cb)
-  RPSTACK_IDENTITY_CHARACTER.createCharacter(src, payload, cb)
+  RPSTACK_IDENTITY_CHARACTER.createCharacter(src, payload, localCallback(cb))
 end)
 
 exports('rpstack:identity:selectCharacter', function(src, char_id, cb)
-  RPSTACK_IDENTITY_CHARACTER.selectCharacter(src, char_id, cb)
+  RPSTACK_IDENTITY_CHARACTER.selectCharacter(src, char_id, localCallback(cb))
 end)
 
 exports('rpstack:identity:getActiveCharacter', function(src)
@@ -27,6 +34,7 @@ exports('rpstack:identity:getActiveCharacter', function(src)
 end)
 
 exports('rpstack:identity:getCharacterById', function(charId, cb)
+  cb = localCallback(cb)
   if type(cb) ~= "function" then return end
   if type(charId) ~= "number"
     or charId <= 0

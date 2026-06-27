@@ -31,13 +31,18 @@ These are verified facts — not assumptions:
 
 1. **Globals do NOT cross resource boundaries.** Each resource has an isolated Lua environment. `RPSTACK_LOG`, `RPSTACK_DB`, etc. defined in one resource are invisible in another. Every resource that needs logging or DB access must load its own `shared/logger.lua` and `shared/db.lua`.
 
-2. **Export call syntax matters.** Use colon syntax only:
+2. **Export proxy receiver handling matters.** Colon syntax supplies the proxy receiver automatically. With bracket syntax, pass the export proxy explicitly as the first argument for both simple and namespaced exports:
 
    ```lua
-   -- CORRECT
+   -- Simple export via colon syntax
    exports['rpstack-persistence']:registerMigration(name, sql)
-   -- WRONG — drops first argument silently
-   exports['rpstack-persistence']['registerMigration'](name, sql)
+
+   -- Simple export via bracket syntax
+   local factions = exports['rpstack-factions']
+   factions['createFaction'](factions, payload, cb)
+
+   -- WRONG — the proxy consumes payload as its receiver
+   factions['createFaction'](payload, cb)
    ```
 
 3. **Export names must be simple strings** — no colons or namespacing in the export name itself. `exports('registerMigration', fn)` not `exports('rpstack:persistence:registerMigration', fn)`.
@@ -46,13 +51,28 @@ These are verified facts — not assumptions:
    `exports('rpstack:economy:getBalance', fn)` — called as
    `exports['rpstack-economy']['rpstack:economy:getBalance'](exports['rpstack-economy'], src, cb)`
 
-4. **Multiline strings `[[...]]` fail across export boundaries** — pass SQL and other long strings as single-line quoted strings.
+4. **Cross-resource callbacks arrive as Cfx function references, not local Lua functions.** At every async export boundary, wrap the callback reference in a local function before internal validation or delegation:
 
-5. **`rpstack:persistence:ready` event** is the startup gate. All resources wait for this before registering event handlers. Wrap the handler body in `CreateThread(function() Wait(0) ... end)` to ensure globals are ready.
+   ```lua
+   local function localCallback(callback)
+     if callback == nil then return nil end
+     return function(result)
+       callback(result)
+     end
+   end
+   ```
 
-6. **`rdr3_warning` required** in every fxmanifest or resource won't start on RedM.
+   In verified runtime calls, `type(callback)` at the boundary was `table`. Do not reject it with `type(callback) ~= 'function'` before adapting it.
 
-7. **System resources** (`sessionmanager-rdr3`, `mapmanager`, `spawnmanager`, `hardcap`) must be copied from `cfx-server-data` into your resources folder and ensured before framework resources.
+5. **Player source IDs change during connection.** `playerConnecting` can expose a temporary source (for example `65537`), while `playerJoining` provides the final runtime source and the temporary value as `oldSrc`. Move session state from `oldSrc` to the final `source`, and use that final source for commands and source-based exports. Never assume the player source is `1`.
+
+6. **Multiline strings `[[...]]` fail across export boundaries** — pass SQL and other long strings as single-line quoted strings.
+
+7. **`rpstack:persistence:ready` event** is the startup gate. All resources wait for this before registering event handlers. Wrap the handler body in `CreateThread(function() Wait(0) ... end)` to ensure globals are ready.
+
+8. **`rdr3_warning` required** in every fxmanifest or resource won't start on RedM.
+
+9. **System resources** (`sessionmanager-rdr3`, `mapmanager`, `spawnmanager`, `hardcap`) must be copied from `cfx-server-data` into your resources folder and ensured before framework resources.
 
 ---
 
@@ -158,12 +178,13 @@ Every non-core resource must declare these in `fxmanifest.lua` **before all othe
 shared_scripts {
   'shared/logger.lua',   -- provides RPSTACK_LOG
   'shared/db.lua',       -- provides RPSTACK_DB
+  'shared/errors.lua',   -- provides RPSTACK_ERRORS
   'shared/constants.lua',
   'shared/contracts.lua',
 }
 ```
 
-Copy `shared/logger.lua` and `shared/db.lua` from `rpstack-economy/shared/` — they are identical across all resources.
+Copy `shared/logger.lua`, `shared/db.lua`, and `shared/errors.lua` from an existing hardened resource — they are identical across resources.
 
 ---
 
@@ -350,6 +371,7 @@ Each non-core resource must have:
 
 - `shared/logger.lua` — local copy of RPSTACK_LOG (identical across resources)
 - `shared/db.lua` — local RPSTACK_DB wrapper that delegates to persistence exports
+- `shared/errors.lua` — local copy of RPSTACK_ERRORS (identical across resources)
 
 ---
 
@@ -403,18 +425,6 @@ ensure rpstack-factions
 
 ---
 
-## Testing from FXServer console
-
-Use the `execute` command to run Lua in a specific resource context:
-execute rpstack-factions print(json.encode(exports['rpstack-factions']:listFactions()))
-
-Rules:
-
-- Always specify the resource name after `execute`
-- Async exports cannot be tested this way — they require a callback. Use a temporary test file in server_scripts instead.
-- Sync cache-read exports can be tested directly from console.
-- `json.encode` is available globally in CfxLua — use it to print table results.
-
 ## getActiveCharacter export syntax
 
 Economy uses bracket syntax to call identity exports (verified in production):
@@ -434,7 +444,7 @@ Note: namespaced exports require bracket syntax and the export proxy as the firs
 - [ ] Input validated (type, range, ownership)
 - [ ] Structured log entry for state changes
 - [ ] Export uses correct naming convention for this module
-- [ ] `shared/logger.lua` and `shared/db.lua` present and in fxmanifest shared_scripts first
+- [ ] `shared/logger.lua`, `shared/db.lua`, and `shared/errors.lua` present and loaded before domain scripts
 - [ ] `rdr3_warning` in fxmanifest
 - [ ] fxmanifest load order correct (logger + db before everything)
 - [ ] No cross-module DB access

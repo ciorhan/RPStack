@@ -8,6 +8,10 @@ local function printResult(stage, result)
   return result and result.ok == true
 end
 
+local function isPositiveInteger(value)
+  return type(value) == 'number' and value > 0 and value == math.floor(value)
+end
+
 RegisterCommand('rpstack_identity_smoke', function(source, args)
   if source ~= 0 then
     print('[SMOKE] Run this command from the FXServer console.')
@@ -67,7 +71,7 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
   end
 
   local characterId = tonumber(args[1])
-  if not characterId or characterId <= 0 or characterId ~= math.floor(characterId) then
+  if not isPositiveInteger(characterId) then
     print('[SMOKE] Usage: rpstack_factions_smoke <characterId>')
     return
   end
@@ -85,7 +89,7 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
   local factions = exports['rpstack-factions']
   local economy = exports['rpstack-economy']
 
-  factions['createFaction']({
+  factions['createFaction'](factions, {
     name = ('Smoke Test %06d'):format(suffix),
     tag = ('T%06d'):format(suffix),
     type = 'guild',
@@ -104,6 +108,7 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
         if not printResult('fundCharacter', funded) then return end
 
         factions['depositToTreasury'](
+          factions,
           factionId,
           characterId,
           200,
@@ -112,6 +117,7 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
             if not printResult('deposit', deposited) then return end
 
             factions['withdrawFromTreasury'](
+              factions,
               factionId,
               characterId,
               75,
@@ -119,11 +125,11 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
               function(withdrawn)
                 if not printResult('withdraw', withdrawn) then return end
 
-                factions['getTreasuryBalance'](factionId, function(balance)
+                factions['getTreasuryBalance'](factions, factionId, function(balance)
                   if not printResult('balance', balance) then return end
 
                   SetTimeout(500, function()
-                    factions['getTreasuryLedger'](factionId, 10, function(ledger)
+                    factions['getTreasuryLedger'](factions, factionId, 10, function(ledger)
                       if not printResult('ledger', ledger) then return end
                       if balance.cash ~= 125 or #ledger.entries < 2 then
                         print('[SMOKE] FAIL: unexpected balance or missing audit entries')
@@ -131,6 +137,7 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
                       end
 
                       factions['depositToTreasury'](
+                        factions,
                         factionId,
                         characterId,
                         1000000,
@@ -162,6 +169,95 @@ end, false)
 
 print('[rpstack-factions-smoke] ready: rpstack_identity_smoke <playerSource>')
 print('[rpstack-factions-smoke] ready: rpstack_factions_smoke <characterId>')
+print('[rpstack-factions-smoke] ready: rpstack_factions_state_smoke <characterId> <factionAId> <factionBId>')
+
+RegisterCommand('rpstack_factions_state_smoke', function(source, args)
+  local completed = false
+  local function finish(passed, details)
+    if completed then return end
+    completed = true
+    print(('[SMOKE] %s state: %s'):format(
+      passed and 'PASS' or 'FAIL',
+      json.encode(details or {})
+    ))
+  end
+
+  if source ~= 0 then
+    finish(false, { error = 'console_only' })
+    return
+  end
+
+  local characterId = tonumber(args[1])
+  local factionAId = tonumber(args[2])
+  local factionBId = tonumber(args[3])
+  if not isPositiveInteger(characterId)
+    or not isPositiveInteger(factionAId)
+    or not isPositiveInteger(factionBId)
+    or factionAId == factionBId
+    or args[4] ~= nil
+  then
+    finish(false, {
+      error = 'usage: rpstack_factions_state_smoke <characterId> <factionAId> <factionBId>',
+    })
+    return
+  end
+
+  local factions = exports['rpstack-factions']
+  local ok, forward, reverse, roster = pcall(function()
+    return factions['getRelationship'](factions, factionAId, factionBId),
+      factions['getRelationship'](factions, factionBId, factionAId),
+      factions['getOnlineRoster'](factions, factionAId)
+  end)
+  if not ok then
+    finish(false, { error = tostring(forward) })
+    return
+  end
+
+  local characterOnline = false
+  if roster and roster.ok and type(roster.roster) == 'table' then
+    for _, member in ipairs(roster.roster) do
+      if member.characterId == characterId then
+        characterOnline = true
+        break
+      end
+    end
+  end
+
+  SetTimeout(5000, function()
+    finish(false, { error = 'treasury_callback_timeout' })
+  end)
+
+  local invoked, invokeError = pcall(function()
+    factions['getTreasuryBalance'](factions, factionAId, function(balance)
+      local forwardHostile = forward
+        and forward.ok == true
+        and forward.status == 'hostile'
+      local reverseHostile = reverse
+        and reverse.ok == true
+        and reverse.status == 'hostile'
+      local treasuryReadable = balance
+        and balance.ok == true
+        and type(balance.cash) == 'number'
+        and type(balance.bank) == 'number'
+
+      finish(
+        forwardHostile
+          and reverseHostile
+          and characterOnline
+          and treasuryReadable,
+        {
+          forwardHostile = forwardHostile,
+          reverseHostile = reverseHostile,
+          characterOnline = characterOnline,
+          treasuryReadable = treasuryReadable,
+        }
+      )
+    end)
+  end)
+  if not invoked then
+    finish(false, { error = tostring(invokeError) })
+  end
+end, false)
 
 RegisterCommand('rpstack_factions_relationship_smoke', function(source, args)
   if source ~= 0 then
@@ -171,23 +267,20 @@ RegisterCommand('rpstack_factions_relationship_smoke', function(source, args)
 
   local characterId = tonumber(args[1])
   local firstFactionId = tonumber(args[2])
-  if not characterId or not firstFactionId then
-    print('[SMOKE] Usage: rpstack_factions_relationship_smoke <characterId> <factionId>')
+  local existingSecondFactionId = tonumber(args[3])
+  if not isPositiveInteger(characterId)
+    or not isPositiveInteger(firstFactionId)
+    or (args[3] ~= nil and not isPositiveInteger(existingSecondFactionId))
+    or existingSecondFactionId == firstFactionId
+  then
+    print('[SMOKE] Usage: rpstack_factions_relationship_smoke <characterId> <factionId> [secondFactionId]')
     return
   end
 
-  local suffix = os.time() % 1000000
   local factions = exports['rpstack-factions']
-  factions['createFaction']({
-    name = ('Relationship Test %06d'):format(suffix),
-    tag = ('R%06d'):format(suffix),
-    type = 'guild',
-    founderCharId = characterId,
-  }, function(created)
-    if not printResult('createRelationshipFaction', created) then return end
-    local secondFactionId = created.faction.id
-
+  local function testRelationship(secondFactionId)
     factions['setRelationship'](
+      factions,
       firstFactionId,
       secondFactionId,
       'hostile',
@@ -195,8 +288,8 @@ RegisterCommand('rpstack_factions_relationship_smoke', function(source, args)
       function(updated)
         if not printResult('setRelationship', updated) then return end
 
-        local forward = factions['getRelationship'](firstFactionId, secondFactionId)
-        local reverse = factions['getRelationship'](secondFactionId, firstFactionId)
+        local forward = factions['getRelationship'](factions, firstFactionId, secondFactionId)
+        local reverse = factions['getRelationship'](factions, secondFactionId, firstFactionId)
         if not forward.ok
           or not reverse.ok
           or forward.status ~= 'hostile'
@@ -212,5 +305,21 @@ RegisterCommand('rpstack_factions_relationship_smoke', function(source, args)
         ))
       end
     )
+  end
+
+  if existingSecondFactionId then
+    testRelationship(existingSecondFactionId)
+    return
+  end
+
+  local suffix = os.time() % 1000000
+  factions['createFaction'](factions, {
+    name = ('Relationship Test %06d'):format(suffix),
+    tag = ('R%06d'):format(suffix),
+    type = 'guild',
+    founderCharId = characterId,
+  }, function(created)
+    if not printResult('createRelationshipFaction', created) then return end
+    testRelationship(created.faction.id)
   end)
 end, false)

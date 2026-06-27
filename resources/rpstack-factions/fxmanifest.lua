@@ -19,6 +19,7 @@ dependencies {
 shared_scripts {
   'shared/logger.lua',
   'shared/db.lua',
+  'shared/errors.lua',
   'shared/constants.lua',
   'shared/contracts.lua',
 }
