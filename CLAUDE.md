@@ -21,9 +21,12 @@ resources/
   rpstack-economy/      cash + bank balances, transaction log
   rpstack-permissions/  roles, policy checks, superadmin bypass
   rpstack-factions/     multi-faction membership, ranks, relationships, treasury
+tests/
+  rpstack-factions-smoke/  guarded console-only FXServer smoke resource
+  unit/                     deterministic Lua regression tests
 ```
 
-Load order must follow this sequence. Each resource declares `dependency` in its fxmanifest.
+Production load order follows manifest dependencies. See the [architecture overview](docs/architecture/overview.md); test setup and restart order are in the [local testing guide](docs/development/testing.md).
 
 ## CfxLua runtime realities (learned in production)
 
@@ -45,24 +48,9 @@ These are verified facts — not assumptions:
    factions['createFaction'](payload, cb)
    ```
 
-3. **Export names must be simple strings** — no colons or namespacing in the export name itself. `exports('registerMigration', fn)` not `exports('rpstack:persistence:registerMigration', fn)`.
+3. **Match the owning resource's export convention.** Persistence and factions use simple names; identity and economy include namespaced names. Bracket calls always pass the proxy receiver explicitly. See [export invocation and callbacks](docs/architecture/overview.md#export-invocation-and-callbacks).
 
-   **Exception:** rpstack-economy uses namespaced export names as a convention:
-   `exports('rpstack:economy:getBalance', fn)` — called as
-   `exports['rpstack-economy']['rpstack:economy:getBalance'](exports['rpstack-economy'], src, cb)`
-
-4. **Cross-resource callbacks arrive as Cfx function references, not local Lua functions.** At every async export boundary, wrap the callback reference in a local function before internal validation or delegation:
-
-   ```lua
-   local function localCallback(callback)
-     if callback == nil then return nil end
-     return function(result)
-       callback(result)
-     end
-   end
-   ```
-
-   In verified runtime calls, `type(callback)` at the boundary was `table`. Do not reject it with `type(callback) ~= 'function'` before adapting it.
+4. **Cross-resource callbacks arrive as Cfx function references, not local Lua functions.** Identity, economy, and factions adapt them before strict domain validation. In verified runtime calls, `type(callback)` at the boundary was `table`; do not reject it before adaptation. Use the canonical pattern in [export invocation and callbacks](docs/architecture/overview.md#export-invocation-and-callbacks).
 
 5. **Player source IDs change during connection.** `playerConnecting` can expose a temporary source (for example `65537`), while `playerJoining` provides the final runtime source and the temporary value as `oldSrc`. Move session state from `oldSrc` to the final `source`, and use that final source for commands and source-based exports. Never assume the player source is `1`.
 
@@ -200,15 +188,17 @@ exports('dbExecute', fn)
 exports('dbSingle', fn)
 ```
 
-**Economy exports** — namespaced names (exception to the simple name rule):
+**Economy exports** — namespaced names:
 
 ```lua
 exports('rpstack:economy:getBalance', fn)
 exports('rpstack:economy:addMoney', fn)
 exports('rpstack:economy:removeMoney', fn)
 exports('rpstack:economy:createAccountForOwner', fn)
+exports('rpstack:economy:getAccountByOwner', fn)
 exports('rpstack:economy:adjustOwnerCash', fn)
 exports('rpstack:economy:adjustCashByCharId', fn)
+exports('rpstack:economy:transferCash', fn)
 ```
 
 Called from other resources as:
@@ -239,23 +229,7 @@ exports('characterHasFactionPerm', fn)
 
 ### Economy account model
 
-```
-rpstack_economy_accounts
-  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY
-  char_id     INT UNSIGNED NULL          -- NULL for non-character owners
-  owner_type  VARCHAR(16) DEFAULT 'character'   -- 'character' | 'faction' | ...
-  owner_id    INT UNSIGNED NULL          -- faction id, town id, etc.
-  account_type VARCHAR(16) DEFAULT 'default'    -- 'default' | 'treasury' | ...
-  cash        INT UNSIGNED DEFAULT 0
-  bank        INT UNSIGNED DEFAULT 0
-```
-
-- Character accounts: `owner_type='character'`, `owner_id=char_id`
-- Faction treasury: `owner_type='faction'`, `owner_id=faction_id`, `account_type='treasury'`
-- All money mutations go through `RPSTACK_LEDGER.apply()` for character accounts
-- Single-account non-character changes use `RPSTACK_ECONOMY_ACCOUNTS.adjustOwnerCash()`
-- Cross-owner movements use `RPSTACK_ECONOMY_ACCOUNTS.transferCash()` so debit and credit happen atomically
-- Never mutate balances with a raw UPDATE outside the economy repository
+Economy owns character and generic owner accounts. Character adjustments use the ledger; generic owner adjustments use economy account operations; cross-owner movements use atomic `transferCash`. Faction treasuries are `(faction, factionId, treasury)` owner accounts. See [economy owner accounts](docs/architecture/overview.md#economy-owner-accounts) and [faction treasury](docs/architecture/overview.md#faction-treasury).
 
 ---
 
@@ -278,9 +252,10 @@ exports['rpstack-economy']['rpstack:economy:getAccountByOwner'](econ, ownerType,
 exports['rpstack-economy']['rpstack:economy:adjustOwnerCash'](econ, ownerType, ownerId, accountType, delta, reason, cb)
 exports['rpstack-economy']['rpstack:economy:transferCash'](econ, fromType, fromId, fromAccountType, toType, toId, toAccountType, amount, reason, cb)
 
--- Callback shape for all money operations:
+-- Common callback shapes (consult shared/contracts.lua for each export):
 -- cb({ ok=bool, cash=number|nil, bank=number|nil, error=string|nil })
 -- cb({ ok=bool, newCash=number|nil, error=string|nil })  -- for adjustOwnerCash
+-- cb({ ok=bool, sourceCash=number|nil, destinationCash=number|nil, error=string|nil }) -- transferCash
 ```
 
 ---
@@ -380,7 +355,7 @@ Each non-core resource must have:
 1. Client requests. Server decides. No exceptions.
 2. Every state-changing server function validates: type, range, ownership, permissions.
 3. Modules own their DB tables. No cross-module table access. Use exports.
-4. Export names are simple strings (exception: economy uses namespaced names — match existing convention per module).
+4. Export names match the owning module's convention; bracket calls pass the proxy receiver.
 5. Network events follow `rpstack:<module>:<event>` naming.
 6. Never trust: source, payload values, entity ownership, positions from client.
 7. Always capture `local src = source` immediately in event handlers — never defer it.
@@ -399,8 +374,11 @@ Each non-core resource must have:
 ## Security invariants
 
 - Deferrals used for connection screening before player enters session
-- Economy operations go through the ledger — never direct balance mutation
+- Economy owns all balance mutation through character ledger or validated owner-account operations
+- Faction rank changes enforce strict hierarchy and permission-subset delegation
 - Audit log entries for: money changes, character create/delete, role changes
+
+See the detailed [rank](docs/architecture/overview.md#faction-rank-authorization) and [treasury](docs/architecture/overview.md#faction-treasury) invariants.
 
 ---
 
@@ -423,6 +401,8 @@ ensure rpstack-economy
 ensure rpstack-factions
 ```
 
+Restarting persistence, identity, permissions, or economy requires a full server restart because those modules do not all support catch-up initialization. Factions does; see [restart ordering](docs/development/testing.md#restart-ordering).
+
 ---
 
 ## getActiveCharacter export syntax
@@ -431,7 +411,8 @@ Economy uses bracket syntax to call identity exports (verified in production):
 
 ```lua
 local identity = exports['rpstack-identity']
-identity['rpstack:identity:getActiveCharacter'](identity, src).character
+local result = identity['rpstack:identity:getActiveCharacter'](identity, src)
+local character = result and result.character or nil
 ```
 
 Note: namespaced exports require bracket syntax and the export proxy as the first argument. The proxy consumes that receiver before forwarding the documented arguments.
@@ -458,8 +439,9 @@ Note: namespaced exports require bracket syntax and the export proxy as the firs
 
 ## Key docs
 
-- Architecture: `docs/architecture/overview.md`
-- Security: `docs/security/threat-model.md`
-- Creating a resource: `docs/development/creating-a-resource.md`
-- ADR log: `docs/architecture/adr/README.md`
-- References: `docs/references/README.md`
+- [Architecture](docs/architecture/overview.md)
+- [Security](docs/security/threat-model.md)
+- [Creating a resource](docs/development/creating-a-resource.md)
+- [Tests and restarts](docs/development/testing.md)
+- [ADR log](docs/architecture/adr/README.md)
+- [References](docs/references/README.md)

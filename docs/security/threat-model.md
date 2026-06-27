@@ -25,7 +25,7 @@
 ### 3. Economy exploits
 
 **Risk:** Client sends negative amounts, overflow values, or triggers duplicate transactions.
-**Mitigation:** All balance mutations through ledger function. Amount validated (positive integer, within limits). Idempotency key on transactions.
+**Mitigation:** Economy owns every balance mutation. Character cash/bank adjustments use the ledger; generic owner movements use validated economy account operations. Cross-owner transfers debit and credit atomically with an insufficient-funds condition. Amounts are positive bounded integers, and reasons and owner tokens are validated. Audit inserts are attempted after successful owner transfers and failures are logged, but an audit failure does not roll back the balance update. The current transaction schema does not provide idempotency keys, so callers must not retry an uncertain mutation as though it were idempotent.
 
 ### 4. Character selection abuse
 
@@ -41,6 +41,11 @@
 
 **Risk:** Attacker triggers resource restart to clear in-memory state (bans, rate limits).
 **Mitigation:** Bans stored in DB. Rate limit state is ephemeral (acceptable — restart resets window).
+
+### 7. Faction rank escalation
+
+**Risk:** A faction officer edits their own rank, edits an equal or higher rank, assigns a rank at their own authority level, or grants permissions they do not possess.
+**Mitigation:** Rank creation and updates require `can_promote`. Both the target rank and resulting level must be strictly below the actor. The actor cannot edit their own assigned rank. Permission fields are boolean and allowlisted, and every enabled permission on the resulting rank must be held by the actor. Authorization completes before repository or audit writes.
 
 ## Out of scope (v0)
 
