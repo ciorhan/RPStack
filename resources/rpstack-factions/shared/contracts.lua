@@ -7,9 +7,9 @@ RPSTACK_FACTIONS_CONTRACTS = {
   -- ── Faction CRUD ──────────────────────────────────────────────────────────
 
   createFaction = {
-    input  = { "payload:table {name:string, tag:string, type:string, founderCharId:number}" },
+    input  = { "payload:table {name:string, tag:string, type:string, founderCharId:number}", "cb:function" },
     output = { "ok:boolean", "faction:table|nil", "error:string|nil" },
-    notes  = "Creates faction + default rank ladder + treasury account. Founder is assigned top rank.",
+    notes  = "ASYNC. Creates faction + default ranks + founder membership + treasury account.",
   },
 
   getFaction = {
@@ -25,13 +25,13 @@ RPSTACK_FACTIONS_CONTRACTS = {
   listFactions = {
     input  = {},
     output = { "ok:boolean", "factions:table[]" },
-    notes  = "Returns all active factions from cache. O(1).",
+    notes  = "Returns all active factions from cache. O(n).",
   },
 
   disbandFaction = {
-    input  = { "factionId:number", "actorCharId:number" },
+    input  = { "factionId:number", "actorCharId:number", "cb:function" },
     output = { "ok:boolean", "error:string|nil" },
-    notes  = "Actor must have can_disband permission. Fires FACTION_EVENTS.DISBANDED.",
+    notes  = "ASYNC. Actor must have can_disband permission. Fires FACTION_EVENTS.DISBANDED.",
   },
 
   -- ── Membership ────────────────────────────────────────────────────────────
@@ -63,19 +63,19 @@ RPSTACK_FACTIONS_CONTRACTS = {
   getCharacterFactions = {
     input  = { "characterId:number" },
     output = { "ok:boolean", "factions:table[]", "error:string|nil" },
-    notes  = "Returns [{faction, rankId, rank}]. O(1) from reverse index cache.",
+    notes  = "Returns [{faction, rankId, rank}] from the reverse index. O(n).",
   },
 
   getFactionMembers = {
     input  = { "factionId:number" },
     output = { "ok:boolean", "members:table[]", "error:string|nil" },
-    notes  = "Returns [{characterId, rankId}]. O(1) from cache.",
+    notes  = "Returns [{characterId, rankId}] from cache. O(n).",
   },
 
   getOnlineRoster = {
     input  = { "factionId:number" },
     output = { "ok:boolean", "roster:table[]", "error:string|nil" },
-    notes  = "Returns [{characterId, rankId}] for currently online members only. O(1).",
+    notes  = "Returns [{characterId, rankId}] for online members. O(n).",
   },
 
   -- ── Permission checks (O(1) — safe to call on every action) ──────────────
@@ -119,9 +119,9 @@ RPSTACK_FACTIONS_CONTRACTS = {
   -- ── Relationships ─────────────────────────────────────────────────────────
 
   setRelationship = {
-    input  = { "factionAId:number", "factionBId:number", "status:string", "actorCharId:number" },
+    input  = { "factionAId:number", "factionBId:number", "status:string", "actorCharId:number", "cb:function" },
     output = { "ok:boolean", "error:string|nil" },
-    notes  = "status is a FACTION_RELATIONSHIP value. Actor must have can_declare in faction A.",
+    notes  = "ASYNC. Persists a canonical pair; actor needs can_declare in faction A.",
   },
 
   getRelationship = {
@@ -141,9 +141,8 @@ RPSTACK_FACTIONS_CONTRACTS = {
   },
 
   -- ── Treasury ──────────────────────────────────────────────────────────────
-  -- ASYNC: treasury exports require a callback as the final argument.
-  -- All other faction exports are synchronous (pure cache).
-  -- Asymmetry exists because rpstack-economy balance mutations are callback-based.
+  -- Treasury exports are async and require a callback as the final argument.
+  -- Balance transfers are delegated atomically to rpstack-economy.
 
   depositToTreasury = {
     input  = { "factionId:number", "characterId:number", "amount:number", "note:string", "cb:function" },
