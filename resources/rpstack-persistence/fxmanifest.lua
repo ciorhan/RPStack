@@ -17,3 +17,7 @@ server_scripts {
   'server/exports.lua',
   'server/main.lua',
 }
+
+shared_scripts {
+  'shared/*.lua',
+}
