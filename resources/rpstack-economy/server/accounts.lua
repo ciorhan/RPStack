@@ -20,6 +20,11 @@ local function isValidDelta(value)
     and math.abs(value) <= RPSTACK_ECONOMY_CONFIG.maxTransactionAmount
 end
 
+local function isValidReason(value)
+  return value == nil
+    or (type(value) == "string" and #value > 0 and #value <= 128)
+end
+
 local function validateOwner(ownerType, ownerId, accountType)
   return isToken(ownerType, 16)
     and isPositiveInteger(ownerId)
@@ -74,6 +79,7 @@ function RPSTACK_ECONOMY_ACCOUNTS.adjustOwnerCash(ownerType, ownerId, accountTyp
   if type(cb) ~= "function"
     or not validateOwner(ownerType, ownerId, accountType)
     or not isValidDelta(delta)
+    or not isValidReason(reason)
   then
     if type(cb) == "function" then cb({ ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED }) end
     return
@@ -130,6 +136,7 @@ function RPSTACK_ECONOMY_ACCOUNTS.transferCash(
     or not validateOwner(toType, toId, toAccount)
     or not isPositiveInteger(amount)
     or amount > RPSTACK_ECONOMY_CONFIG.maxTransactionAmount
+    or not isValidReason(reason)
     or (fromType == toType and fromId == toId and fromAccount == toAccount)
   then
     if type(cb) == "function" then cb({ ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED }) end
@@ -159,10 +166,36 @@ function RPSTACK_ECONOMY_ACCOUNTS.transferCash(
 
           local auditReason = reason or "transferCash"
           RPSTACK_ECONOMY_REPO.logOwnerTransaction(
-            fromType, fromId, fromAccount, -amount, auditReason, source.cash, function() end
+            fromType,
+            fromId,
+            fromAccount,
+            -amount,
+            auditReason,
+            source.cash,
+            function(transactionId)
+              if not transactionId then
+                RPSTACK_LOG.error("economy", "transfer debit audit failed", {
+                  ownerType = fromType,
+                  ownerId = fromId,
+                })
+              end
+            end
           )
           RPSTACK_ECONOMY_REPO.logOwnerTransaction(
-            toType, toId, toAccount, amount, auditReason, destination.cash, function() end
+            toType,
+            toId,
+            toAccount,
+            amount,
+            auditReason,
+            destination.cash,
+            function(transactionId)
+              if not transactionId then
+                RPSTACK_LOG.error("economy", "transfer credit audit failed", {
+                  ownerType = toType,
+                  ownerId = toId,
+                })
+              end
+            end
           )
 
           cb({
