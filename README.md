@@ -37,6 +37,15 @@ If you want a long-term codebase that can keep evolving without rewrites, this i
 
 ---
 
+## Product direction
+
+The first player-facing vertical slice is **First Arrival**: a reliable
+connect-to-spawn flow that combines meaningful character creation, a narrative
+arrival, and one reason to begin roleplaying. See the
+[First Arrival product brief](docs/product/first-arrival.md).
+
+---
+
 ## Architecture (high level)
 
 RPStack is designed around a **core + modules** model.
