@@ -74,6 +74,13 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
 
   print(('[SMOKE] starting with characterId=%d'):format(characterId))
 
+  local createCompleted = false
+  SetTimeout(5000, function()
+    if not createCompleted then
+      print('[SMOKE] TIMEOUT: createFaction callback did not complete')
+    end
+  end)
+
   local suffix = os.time() % 1000000
   local factions = exports['rpstack-factions']
   local economy = exports['rpstack-economy']
@@ -84,6 +91,7 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
     type = 'guild',
     founderCharId = characterId,
   }, function(created)
+    createCompleted = true
     if not printResult('createFaction', created) then return end
     local factionId = created.faction.id
 
