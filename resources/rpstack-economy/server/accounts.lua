@@ -39,7 +39,10 @@ end
 
 function RPSTACK_ECONOMY_ACCOUNTS.createAccountForOwner(ownerType, ownerId, accountType, cb)
   accountType = accountType or "default"
-  if type(cb) ~= "function" or not validateOwner(ownerType, ownerId, accountType) then
+  if type(cb) ~= "function"
+    or ownerType == "character"
+    or not validateOwner(ownerType, ownerId, accountType)
+  then
     if type(cb) == "function" then cb({ ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED }) end
     return
   end
@@ -174,7 +177,23 @@ function RPSTACK_ECONOMY_ACCOUNTS.transferCash(
 end
 
 function RPSTACK_ECONOMY_ACCOUNTS.createAccount(characterId, cb)
-  RPSTACK_ECONOMY_ACCOUNTS.createAccountForOwner("character", characterId, "default", cb)
+  if type(cb) ~= "function" or not isPositiveInteger(characterId) then
+    if type(cb) == "function" then cb({ ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED }) end
+    return
+  end
+
+  RPSTACK_ECONOMY_REPO.create(characterId, 0, 0, function(accountId)
+    if not accountId then
+      cb({ ok = false, error = RPSTACK_ERRORS.INTERNAL })
+      return
+    end
+    RPSTACK_ECONOMY_ACCOUNTS.getAccountByOwner(
+      "character",
+      characterId,
+      "default",
+      cb
+    )
+  end)
 end
 
 function RPSTACK_ECONOMY_ACCOUNTS.adjustCashByCharId(characterId, delta, reason, cb)
