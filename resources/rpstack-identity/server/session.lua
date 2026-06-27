@@ -45,6 +45,7 @@ function RPSTACK_IDENTITY_SESSION.onPlayerJoining(src, cb)
       }
       RPSTACK_IDENTITY_STATE.sessions[src] = session
       RPSTACK_LOG.info("identity", "session created", { source = src, account_id = account.id })
+      TriggerEvent('rpstack:identity:sessionCreated', src, account.id)
       cb(session, nil)
     else
       -- New account
@@ -64,6 +65,7 @@ function RPSTACK_IDENTITY_SESSION.onPlayerJoining(src, cb)
         }
         RPSTACK_IDENTITY_STATE.sessions[src] = session
         RPSTACK_LOG.info("identity", "account created", { source = src, account_id = account_id })
+        TriggerEvent('rpstack:identity:sessionCreated', src, account_id)
         cb(session, nil)
       end)
     end
@@ -74,6 +76,8 @@ function RPSTACK_IDENTITY_SESSION.onPlayerDropped(src, reason)
   local session = RPSTACK_IDENTITY_STATE.sessions[src]
   RPSTACK_IDENTITY_STATE.sessions[src] = nil
   RPSTACK_IDENTITY_STATE.activeCharacterBySource[src] = nil
+
+  TriggerEvent('rpstack:identity:sessionDropped', src, session and session.account_id)
 
   RPSTACK_LOG.info("identity", "session dropped", {
     source     = src,

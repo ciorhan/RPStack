@@ -22,4 +22,5 @@ ensure oxmysql
 ensure rpstack-core
 ensure rpstack-persistence
 ensure rpstack-identity
+ensure rpstack-permissions
 ensure rpstack-economy
