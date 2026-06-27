@@ -16,6 +16,9 @@ exports['rpstack-persistence']:registerMigration('factions_relationships_v1',
 exports['rpstack-persistence']:registerMigration('factions_audit_log_v1',
   "CREATE TABLE IF NOT EXISTS `rpstack_faction_audit_log` (`id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `faction_id` INT UNSIGNED NOT NULL, `actor_char_id` INT UNSIGNED NOT NULL, `action` VARCHAR(64) NOT NULL, `payload` TEXT, `created_at` BIGINT NOT NULL, INDEX `idx_faction_time` (`faction_id`, `created_at`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4")
 
+exports['rpstack-persistence']:registerMigration('factions_rank_levels_v2',
+  "ALTER TABLE `rpstack_faction_ranks` ADD UNIQUE INDEX IF NOT EXISTS `uq_faction_rank_level` (`faction_id`, `level`)")
+
 AddEventHandler('rpstack:persistence:ready', function()
   CreateThread(function()
     Wait(0)
@@ -36,13 +39,6 @@ AddEventHandler('rpstack:persistence:ready', function()
         end
       end)
 
-      AddEventHandler('playerDropped', function()
-        local src = source
-        local result = exports['rpstack-identity']:getActiveCharacter(src)
-        if result and result.ok and result.character then
-          RPSTACK_FACTIONS_MEMBERSHIP.onCharacterUnloaded(result.character.id)
-        end
-      end)
 
       RPSTACK_LOG.info("factions", "ready", {
         factions = (function()
