@@ -119,6 +119,14 @@ function RPSTACK_FACTIONS_CACHE.addRank(factionId, rank)
 end
 
 function RPSTACK_FACTIONS_CACHE.updateRank(factionId, rank)
+  local state = RPSTACK_FACTIONS_STATE
+  local existing = state.ranks[factionId] and state.ranks[factionId][rank.id]
+  if existing
+    and existing.level ~= rank.level
+    and state.rank_by_level[factionId]
+  then
+    state.rank_by_level[factionId][existing.level] = nil
+  end
   RPSTACK_FACTIONS_CACHE.addRank(factionId, rank)
 end
 
