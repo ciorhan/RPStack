@@ -127,7 +127,7 @@ RegisterCommand('rpstack_factions_relationship_smoke', function(source, args)
     factions:setRelationship(
       firstFactionId,
       secondFactionId,
-      FACTION_RELATIONSHIP.HOSTILE,
+      'hostile',
       characterId,
       function(updated)
         if not printResult('setRelationship', updated) then return end
@@ -136,8 +136,8 @@ RegisterCommand('rpstack_factions_relationship_smoke', function(source, args)
         local reverse = factions:getRelationship(secondFactionId, firstFactionId)
         if not forward.ok
           or not reverse.ok
-          or forward.status ~= FACTION_RELATIONSHIP.HOSTILE
-          or reverse.status ~= FACTION_RELATIONSHIP.HOSTILE
+          or forward.status ~= 'hostile'
+          or reverse.status ~= 'hostile'
         then
           print('[SMOKE] FAIL: relationship is not symmetric')
           return
