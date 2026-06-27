@@ -42,6 +42,7 @@ function RPSTACK_IDENTITY_CHARACTER.createCharacter(src, payload, cb)
       account_id = session.account_id,
     })
 
+    TriggerEvent('rpstack:identity:characterCreated', char_id)
     cb({ ok = true, character = character })
   end)
 end
