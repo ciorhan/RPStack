@@ -99,3 +99,55 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
 end, false)
 
 print('[rpstack-factions-smoke] ready: rpstack_factions_smoke <characterId>')
+
+RegisterCommand('rpstack_factions_relationship_smoke', function(source, args)
+  if source ~= 0 then
+    print('[SMOKE] Run this command from the FXServer console.')
+    return
+  end
+
+  local characterId = tonumber(args[1])
+  local firstFactionId = tonumber(args[2])
+  if not characterId or not firstFactionId then
+    print('[SMOKE] Usage: rpstack_factions_relationship_smoke <characterId> <factionId>')
+    return
+  end
+
+  local suffix = os.time() % 1000000
+  local factions = exports['rpstack-factions']
+  factions:createFaction({
+    name = ('Relationship Test %06d'):format(suffix),
+    tag = ('R%06d'):format(suffix),
+    type = 'guild',
+    founderCharId = characterId,
+  }, function(created)
+    if not printResult('createRelationshipFaction', created) then return end
+    local secondFactionId = created.faction.id
+
+    factions:setRelationship(
+      firstFactionId,
+      secondFactionId,
+      FACTION_RELATIONSHIP.HOSTILE,
+      characterId,
+      function(updated)
+        if not printResult('setRelationship', updated) then return end
+
+        local forward = factions:getRelationship(firstFactionId, secondFactionId)
+        local reverse = factions:getRelationship(secondFactionId, firstFactionId)
+        if not forward.ok
+          or not reverse.ok
+          or forward.status ~= FACTION_RELATIONSHIP.HOSTILE
+          or reverse.status ~= FACTION_RELATIONSHIP.HOSTILE
+        then
+          print('[SMOKE] FAIL: relationship is not symmetric')
+          return
+        end
+
+        print(('[SMOKE] PASS relationship factionId=%d secondFactionId=%d'):format(
+          firstFactionId,
+          secondFactionId
+        ))
+      end
+    )
+  end)
+end, false)
