@@ -75,6 +75,16 @@ function RPSTACK_FACTIONS_FACTION.createFaction(payload, cb)
     return
   end
 
+  local founderFactions = RPSTACK_FACTIONS_STATE.char_factions[founderCharId] or {}
+  local founderFactionCount = 0
+  for _ in pairs(founderFactions) do
+    founderFactionCount = founderFactionCount + 1
+  end
+  if founderFactionCount >= RPSTACK_FACTIONS_CONFIG.max_factions_per_character then
+    cb({ ok = false, error = RPSTACK_ERRORS.CONFLICT })
+    return
+  end
+
   if RPSTACK_FACTIONS_STATE.tags[tag] then
     cb({ ok = false, error = RPSTACK_ERRORS.CONFLICT })
     return
