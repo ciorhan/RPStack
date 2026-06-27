@@ -74,6 +74,15 @@ end
 
 function RPSTACK_IDENTITY_SESSION.onPlayerDropped(src, reason)
   local session = RPSTACK_IDENTITY_STATE.sessions[src]
+  local character = RPSTACK_IDENTITY_STATE.activeCharacterBySource[src]
+
+  if character then
+    TriggerEvent('rpstack:identity:characterUnloaded', {
+      source = src,
+      characterId = character.id,
+    })
+  end
+
   RPSTACK_IDENTITY_STATE.sessions[src] = nil
   RPSTACK_IDENTITY_STATE.activeCharacterBySource[src] = nil
 
