@@ -8,6 +8,58 @@ local function printResult(stage, result)
   return result and result.ok == true
 end
 
+RegisterCommand('rpstack_identity_smoke', function(source, args)
+  if source ~= 0 then
+    print('[SMOKE] Run this command from the FXServer console.')
+    return
+  end
+
+  local playerSource = tonumber(args[1])
+  if not playerSource or playerSource <= 0 then
+    print('[SMOKE] Usage: rpstack_identity_smoke <playerSource>')
+    return
+  end
+
+  local identity = exports['rpstack-identity']
+
+  local function selectCharacter(character)
+    identity['rpstack:identity:selectCharacter'](
+      identity,
+      playerSource,
+      character.id,
+      function(selected)
+        if not printResult('selectCharacter', selected) then return end
+        print(('[SMOKE] IDENTITY PASS playerSource=%d characterId=%d'):format(
+          playerSource,
+          selected.character.id
+        ))
+      end
+    )
+  end
+
+  identity['rpstack:identity:getCharacters'](
+    identity,
+    playerSource,
+    function(result)
+      if not printResult('getCharacters', result) then return end
+      if result.characters[1] then
+        selectCharacter(result.characters[1])
+        return
+      end
+
+      identity['rpstack:identity:createCharacter'](
+        identity,
+        playerSource,
+        { firstName = 'Smoke', lastName = 'Tester' },
+        function(created)
+          if not printResult('createCharacter', created) then return end
+          selectCharacter(created.character)
+        end
+      )
+    end
+  )
+end, false)
+
 RegisterCommand('rpstack_factions_smoke', function(source, args)
   if source ~= 0 then
     print('[SMOKE] Run this command from the FXServer console.')
