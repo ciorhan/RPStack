@@ -21,6 +21,7 @@ end
 -- reason:  string description for the audit log
 -- cb({ ok, cash, bank, error })
 function RPSTACK_LEDGER.apply(char_id, account, delta, reason, cb)
+  if type(cb) ~= "function" then return end
   if not validateAccount(account) then
     return cb({ ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED })
   end

@@ -24,8 +24,19 @@ local function isValidLevel(value)
 end
 
 local function validatePermissionFields(payload)
+  for key, value in pairs(payload) do
+    if key ~= "name" and key ~= "level" then
+      if not FACTION_PERMS_SET[key] or type(value) ~= "boolean" then
+        return false
+      end
+    end
+  end
+  return true
+end
+
+local function actorCanGrantPermissions(actorRank, permissions)
   for _, key in ipairs(PERMISSION_KEYS) do
-    if payload[key] ~= nil and type(payload[key]) ~= "boolean" then
+    if permissions[key] == true and actorRank[key] ~= true then
       return false
     end
   end
@@ -35,10 +46,12 @@ end
 local function buildPermissions(payload, existing)
   local permissions = {}
   for _, key in ipairs(PERMISSION_KEYS) do
-    if payload[key] == nil then
-      permissions[key] = existing and existing[key] or (key == "can_deposit")
-    else
+    if payload[key] ~= nil then
       permissions[key] = payload[key]
+    elseif existing and existing[key] ~= nil then
+      permissions[key] = existing[key]
+    else
+      permissions[key] = key == "can_deposit"
     end
   end
   return permissions
@@ -115,8 +128,17 @@ function RPSTACK_FACTIONS_RANKS.createRank(factionId, payload, actorCharId, cb)
     return
   end
 
-  local actorLevel = RPSTACK_FACTIONS_RANKS.getRankLevel(factionId, actorCharId)
-  if not actorLevel or payload.level >= actorLevel then
+  local actorRank = RPSTACK_FACTIONS_MEMBERSHIP.getCharacterFactionRank(
+    factionId,
+    actorCharId
+  ).rank
+  if not actorRank or payload.level >= actorRank.level then
+    cb({ ok = false, error = RPSTACK_ERRORS.NOT_AUTHORIZED })
+    return
+  end
+
+  local permissions = buildPermissions(payload)
+  if not actorCanGrantPermissions(actorRank, permissions) then
     cb({ ok = false, error = RPSTACK_ERRORS.NOT_AUTHORIZED })
     return
   end
@@ -125,7 +147,6 @@ function RPSTACK_FACTIONS_RANKS.createRank(factionId, payload, actorCharId, cb)
     return
   end
 
-  local permissions = buildPermissions(payload)
   RPSTACK_FACTIONS_REPO.insertRank(
     factionId,
     payload.name,
@@ -208,7 +229,16 @@ function RPSTACK_FACTIONS_RANKS.updateRank(
     cb({ ok = false, error = RPSTACK_ERRORS.NOT_AUTHORIZED })
     return
   end
-  if rankId ~= actorRank.id and (existing.level >= actorRank.level or level >= actorRank.level) then
+  if rankId == actorRank.id
+    or existing.level >= actorRank.level
+    or level >= actorRank.level
+  then
+    cb({ ok = false, error = RPSTACK_ERRORS.NOT_AUTHORIZED })
+    return
+  end
+
+  local permissions = buildPermissions(payload, existing)
+  if not actorCanGrantPermissions(actorRank, permissions) then
     cb({ ok = false, error = RPSTACK_ERRORS.NOT_AUTHORIZED })
     return
   end
@@ -219,7 +249,6 @@ function RPSTACK_FACTIONS_RANKS.updateRank(
     return
   end
 
-  local permissions = buildPermissions(payload, existing)
   RPSTACK_FACTIONS_REPO.updateRank(
     rankId,
     name,

@@ -103,11 +103,13 @@ RPSTACK_FACTIONS_CONTRACTS = {
   createRank = {
     input  = { "factionId:number", "payload:table {name:string, level:number, ...perms}", "actorCharId:number" },
     output = { "ok:boolean", "rank:table|nil", "error:string|nil" },
+    notes  = "ASYNC. Level must be below the actor; enabled permissions must be held by the actor.",
   },
 
   updateRank = {
     input  = { "factionId:number", "rankId:number", "payload:table", "actorCharId:number" },
     output = { "ok:boolean", "error:string|nil" },
+    notes  = "ASYNC. Cannot edit own/equal/higher rank; resulting level and permissions stay below actor authority.",
   },
 
   getRanks = {

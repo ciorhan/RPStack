@@ -170,6 +170,7 @@ end, false)
 print('[rpstack-factions-smoke] ready: rpstack_identity_smoke <playerSource>')
 print('[rpstack-factions-smoke] ready: rpstack_factions_smoke <characterId>')
 print('[rpstack-factions-smoke] ready: rpstack_factions_state_smoke <characterId> <factionAId> <factionBId>')
+print('[rpstack-factions-smoke] ready: rpstack_economy_callbacks_smoke <playerSource>')
 
 RegisterCommand('rpstack_factions_state_smoke', function(source, args)
   local completed = false
@@ -257,6 +258,91 @@ RegisterCommand('rpstack_factions_state_smoke', function(source, args)
   if not invoked then
     finish(false, { error = tostring(invokeError) })
   end
+end, false)
+
+RegisterCommand('rpstack_economy_callbacks_smoke', function(source, args)
+  if source ~= 0 then
+    print('[SMOKE] FAIL economy callbacks: console_only')
+    return
+  end
+
+  local playerSource = tonumber(args[1])
+  if not isPositiveInteger(playerSource) then
+    print('[SMOKE] FAIL economy callbacks: usage')
+    return
+  end
+
+  local economy = exports['rpstack-economy']
+  local tests = {
+    {
+      name = 'getBalance',
+      expectOk = true,
+      invoke = function(cb)
+        economy['rpstack:economy:getBalance'](economy, playerSource, cb)
+      end,
+    },
+    {
+      name = 'addMoney',
+      expectOk = false,
+      invoke = function(cb)
+        economy['rpstack:economy:addMoney'](economy, playerSource, 'cash', 0, 'callback_smoke', cb)
+      end,
+    },
+    {
+      name = 'removeMoney',
+      expectOk = false,
+      invoke = function(cb)
+        economy['rpstack:economy:removeMoney'](economy, playerSource, 'cash', 0, 'callback_smoke', cb)
+      end,
+    },
+    {
+      name = 'deposit',
+      expectOk = false,
+      invoke = function(cb)
+        economy['rpstack:economy:deposit'](economy, playerSource, 0, 'callback_smoke', cb)
+      end,
+    },
+    {
+      name = 'withdraw',
+      expectOk = false,
+      invoke = function(cb)
+        economy['rpstack:economy:withdraw'](economy, playerSource, 0, 'callback_smoke', cb)
+      end,
+    },
+  }
+
+  local completed = false
+  local index = 1
+  local function finish(passed, detail)
+    if completed then return end
+    completed = true
+    print(('[SMOKE] %s economy callbacks: %s'):format(
+      passed and 'PASS' or 'FAIL',
+      detail
+    ))
+  end
+
+  local runNext
+  runNext = function()
+    local test = tests[index]
+    if not test then
+      finish(true, ('callbacks=%d'):format(#tests))
+      return
+    end
+    test.invoke(function(result)
+      if not result or result.ok ~= test.expectOk then
+        finish(false, ('%s result=%s'):format(test.name, json.encode(result or {})))
+        return
+      end
+      index = index + 1
+      runNext()
+    end)
+  end
+
+  SetTimeout(5000, function()
+    finish(false, ('callback_timeout index=%d'):format(index))
+  end)
+  runNext()
 end, false)
 
 RegisterCommand('rpstack_factions_relationship_smoke', function(source, args)

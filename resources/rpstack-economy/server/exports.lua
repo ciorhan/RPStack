@@ -16,6 +16,8 @@ end
 
 -- Get current balances. cb({ ok, cash, bank })
 exports('rpstack:economy:getBalance', function(src, cb)
+  cb = localCallback(cb)
+  if type(cb) ~= "function" then return end
   local char = getChar(src)
   if not char then return cb({ ok = false, error = RPSTACK_ERRORS.NOT_FOUND }) end
 
@@ -27,6 +29,8 @@ end)
 
 -- Add money to cash or bank. account = "cash" | "bank"
 exports('rpstack:economy:addMoney', function(src, account, amount, reason, cb)
+  cb = localCallback(cb)
+  if type(cb) ~= "function" then return end
   local char = getChar(src)
   if not char then return cb({ ok = false, error = RPSTACK_ERRORS.NOT_FOUND }) end
   if type(amount) ~= "number" or amount <= 0 then
@@ -37,6 +41,8 @@ end)
 
 -- Remove money from cash or bank.
 exports('rpstack:economy:removeMoney', function(src, account, amount, reason, cb)
+  cb = localCallback(cb)
+  if type(cb) ~= "function" then return end
   local char = getChar(src)
   if not char then return cb({ ok = false, error = RPSTACK_ERRORS.NOT_FOUND }) end
   if type(amount) ~= "number" or amount <= 0 then
@@ -47,6 +53,8 @@ end)
 
 -- Move money from cash to bank.
 exports('rpstack:economy:deposit', function(src, amount, reason, cb)
+  cb = localCallback(cb)
+  if type(cb) ~= "function" then return end
   local char = getChar(src)
   if not char then return cb({ ok = false, error = RPSTACK_ERRORS.NOT_FOUND }) end
   RPSTACK_LEDGER.apply(char.id, "cash", -amount, reason or "deposit", function(r1)
@@ -57,6 +65,8 @@ end)
 
 -- Move money from bank to cash.
 exports('rpstack:economy:withdraw', function(src, amount, reason, cb)
+  cb = localCallback(cb)
+  if type(cb) ~= "function" then return end
   local char = getChar(src)
   if not char then return cb({ ok = false, error = RPSTACK_ERRORS.NOT_FOUND }) end
   RPSTACK_LEDGER.apply(char.id, "bank", -amount, reason or "withdraw", function(r1)
