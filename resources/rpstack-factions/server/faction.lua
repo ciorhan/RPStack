@@ -44,59 +44,14 @@ function RPSTACK_FACTIONS_FACTION.listFactions()
   return { ok = true, factions = list }
 end
 
-function RPSTACK_FACTIONS_FACTION.createFaction(payload, cb)
-  if type(cb) ~= "function" then return end
-  if type(payload) ~= "table" then
-    cb({ ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED })
-    return
-  end
-
-  local name = type(payload.name) == "string" and trim(payload.name) or nil
-  local tag = type(payload.tag) == "string"
-    and string.upper(trim(payload.tag))
-    or nil
-  local factionType = payload.type
-  local founderCharId = payload.founderCharId
-  local description = payload.description == nil and "" or payload.description
-
-  if not name
-    or #name < RPSTACK_FACTIONS_CONFIG.name_min_length
-    or #name > RPSTACK_FACTIONS_CONFIG.name_max_length
-    or not tag
-    or #tag < RPSTACK_FACTIONS_CONFIG.tag_min_length
-    or #tag > RPSTACK_FACTIONS_CONFIG.tag_max_length
-    or tag:match("^[A-Z0-9]+$") == nil
-    or not FACTION_TYPES_SET[factionType]
-    or not isPositiveInteger(founderCharId)
-    or type(description) ~= "string"
-    or #description > 512
-  then
-    cb({ ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED })
-    return
-  end
-
-  local founderFactions = RPSTACK_FACTIONS_STATE.char_factions[founderCharId] or {}
-  local founderFactionCount = 0
-  for _ in pairs(founderFactions) do
-    founderFactionCount = founderFactionCount + 1
-  end
-  if founderFactionCount >= RPSTACK_FACTIONS_CONFIG.max_factions_per_character then
-    cb({ ok = false, error = RPSTACK_ERRORS.CONFLICT })
-    return
-  end
-
-  if RPSTACK_FACTIONS_STATE.tags[tag] then
-    cb({ ok = false, error = RPSTACK_ERRORS.CONFLICT })
-    return
-  end
-  local normalizedName = string.lower(name)
-  for _, faction in pairs(RPSTACK_FACTIONS_STATE.factions) do
-    if string.lower(faction.name) == normalizedName then
-      cb({ ok = false, error = RPSTACK_ERRORS.CONFLICT })
-      return
-    end
-  end
-
+local function persistFaction(
+  name,
+  tag,
+  factionType,
+  description,
+  founderCharId,
+  cb
+)
   RPSTACK_FACTIONS_REPO.insertFaction(
     name,
     tag,
@@ -194,6 +149,91 @@ function RPSTACK_FACTIONS_FACTION.createFaction(payload, cb)
       )
     end
   )
+end
+
+function RPSTACK_FACTIONS_FACTION.createFaction(payload, cb)
+  if type(cb) ~= "function" then return end
+  if type(payload) ~= "table" then
+    cb({ ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED })
+    return
+  end
+
+  local name = type(payload.name) == "string" and trim(payload.name) or nil
+  local tag = type(payload.tag) == "string"
+    and string.upper(trim(payload.tag))
+    or nil
+  local factionType = payload.type
+  local founderCharId = payload.founderCharId
+  local description = payload.description == nil and "" or payload.description
+
+  if not name
+    or #name < RPSTACK_FACTIONS_CONFIG.name_min_length
+    or #name > RPSTACK_FACTIONS_CONFIG.name_max_length
+    or not tag
+    or #tag < RPSTACK_FACTIONS_CONFIG.tag_min_length
+    or #tag > RPSTACK_FACTIONS_CONFIG.tag_max_length
+    or tag:match("^[A-Z0-9]+$") == nil
+    or not FACTION_TYPES_SET[factionType]
+    or not isPositiveInteger(founderCharId)
+    or type(description) ~= "string"
+    or #description > 512
+  then
+    cb({ ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED })
+    return
+  end
+
+  local founderFactions = RPSTACK_FACTIONS_STATE.char_factions[founderCharId] or {}
+  local founderFactionCount = 0
+  for _ in pairs(founderFactions) do
+    founderFactionCount = founderFactionCount + 1
+  end
+  if founderFactionCount >= RPSTACK_FACTIONS_CONFIG.max_factions_per_character then
+    cb({ ok = false, error = RPSTACK_ERRORS.CONFLICT })
+    return
+  end
+
+  if RPSTACK_FACTIONS_STATE.tags[tag] then
+    cb({ ok = false, error = RPSTACK_ERRORS.CONFLICT })
+    return
+  end
+  local normalizedName = string.lower(name)
+  for _, faction in pairs(RPSTACK_FACTIONS_STATE.factions) do
+    if string.lower(faction.name) == normalizedName then
+      cb({ ok = false, error = RPSTACK_ERRORS.CONFLICT })
+      return
+    end
+  end
+
+  local identity = exports["rpstack-identity"]
+  local ok, err = pcall(function()
+    identity['rpstack:identity:getCharacterById'](
+      founderCharId,
+      function(result)
+        if not result or not result.ok then
+          cb({
+            ok = false,
+            error = result and result.error or RPSTACK_ERRORS.NOT_FOUND,
+          })
+          return
+        end
+        persistFaction(
+          name,
+          tag,
+          factionType,
+          description,
+          founderCharId,
+          cb
+        )
+      end
+    )
+  end)
+  if not ok then
+    RPSTACK_LOG.error("factions", "identity export failed", {
+      founderCharId = founderCharId,
+      error = tostring(err),
+    })
+    cb({ ok = false, error = RPSTACK_ERRORS.INTERNAL })
+  end
 end
 
 function RPSTACK_FACTIONS_FACTION.disbandFaction(factionId, actorCharId, cb)
