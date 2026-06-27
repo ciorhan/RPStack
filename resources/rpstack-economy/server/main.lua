@@ -12,12 +12,26 @@ exports['rpstack-persistence']:registerMigration(
   'economy_003_add_owner_type',
   "ALTER TABLE `rpstack_economy_accounts` MODIFY COLUMN `char_id` INT UNSIGNED NULL, ADD COLUMN IF NOT EXISTS `owner_type` VARCHAR(16) NOT NULL DEFAULT 'character' AFTER `char_id`, ADD COLUMN IF NOT EXISTS `owner_id` INT UNSIGNED NULL AFTER `owner_type`, ADD INDEX IF NOT EXISTS `idx_owner` (`owner_type`, `owner_id`)"
 )
- 
+
 exports['rpstack-persistence']:registerMigration(
   'economy_004_backfill_owner_id',
   "UPDATE `rpstack_economy_accounts` SET `owner_id` = `char_id` WHERE `owner_type` = 'character' AND `owner_id` IS NULL AND `char_id` IS NOT NULL"
 )
- 
+
+exports['rpstack-persistence']:registerMigration(
+  'economy_005_complete_owner_accounts',
+  "ALTER TABLE `rpstack_economy_accounts` ADD COLUMN IF NOT EXISTS `account_type` VARCHAR(16) NOT NULL DEFAULT 'default' AFTER `owner_id`, ADD UNIQUE INDEX IF NOT EXISTS `uq_owner_account` (`owner_type`, `owner_id`, `account_type`)"
+)
+
+exports['rpstack-persistence']:registerMigration(
+  'economy_006_add_transaction_owners',
+  "ALTER TABLE `rpstack_economy_transactions` MODIFY COLUMN `char_id` INT UNSIGNED NULL, ADD COLUMN IF NOT EXISTS `owner_type` VARCHAR(16) NOT NULL DEFAULT 'character' AFTER `char_id`, ADD COLUMN IF NOT EXISTS `owner_id` INT UNSIGNED NULL AFTER `owner_type`, ADD COLUMN IF NOT EXISTS `account_type` VARCHAR(16) NOT NULL DEFAULT 'default' AFTER `owner_id`, ADD INDEX IF NOT EXISTS `idx_transaction_owner` (`owner_type`, `owner_id`, `account_type`)"
+)
+
+exports['rpstack-persistence']:registerMigration(
+  'economy_007_backfill_transaction_owners',
+  "UPDATE `rpstack_economy_transactions` SET `owner_id` = `char_id` WHERE `owner_type` = 'character' AND `owner_id` IS NULL AND `char_id` IS NOT NULL"
+)
 
 AddEventHandler('rpstack:persistence:ready', function()
   CreateThread(function()
@@ -39,8 +53,8 @@ AddEventHandler('rpstack:persistence:ready', function()
             end
             RPSTACK_LOG.info("economy", "economy account created", {
               char_id = char_id,
-              cash    = RPSTACK_ECONOMY_CONFIG.startingCash,
-              bank    = RPSTACK_ECONOMY_CONFIG.startingBank,
+              cash = RPSTACK_ECONOMY_CONFIG.startingCash,
+              bank = RPSTACK_ECONOMY_CONFIG.startingBank,
             })
           end
         )
@@ -50,23 +64,3 @@ AddEventHandler('rpstack:persistence:ready', function()
     RPSTACK_LOG.info("economy", "rpstack-economy ready")
   end)
 end)
-
--- Migration: economy_accounts owner_type extension
--- Registered by rpstack-economy on startup.
--- Adds generic owner_type + owner_id columns so any entity
--- (faction, town, railroad, etc.) can hold an economy account.
--- character_id becomes nullable; existing rows are backfilled.
---
--- This migration MUST run before rpstack-factions starts.
--- Dependency is enforced via server.cfg load order:
---   ensure rpstack-economy   (before)
---   ensure rpstack-factions  (after)
-
-RPSTACK_ECONOMY_MIGRATIONS = RPSTACK_ECONOMY_MIGRATIONS or {}
-
-table.insert(RPSTACK_ECONOMY_MIGRATIONS, {
-  id  = "economy_accounts_owner_type_v1",
-  up  = "ALTER TABLE economy_accounts MODIFY COLUMN character_id INT UNSIGNED NULL, ADD COLUMN IF NOT EXISTS owner_type VARCHAR(16) NOT NULL DEFAULT 'character' AFTER character_id, ADD COLUMN IF NOT EXISTS owner_id INT UNSIGNED NULL AFTER owner_type, ADD INDEX IF NOT EXISTS idx_owner (owner_type, owner_id)",
-  -- Backfill: for all existing character rows, set owner_id = character_id
-  post = "UPDATE economy_accounts SET owner_id = character_id WHERE owner_type = 'character' AND owner_id IS NULL AND character_id IS NOT NULL",
-})
