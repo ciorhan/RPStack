@@ -1,97 +1,130 @@
--- rpstack-factions/server/relationships.lua
 -- Faction-to-faction relationship management.
--- Reads are O(1) from cache (called frequently by law/supply/combat systems).
 
 RPSTACK_FACTIONS_RELATIONSHIPS = {}
 
 local VALID_STATUS = {
-  [FACTION_RELATIONSHIP.ALLY]    = true,
+  [FACTION_RELATIONSHIP.ALLY] = true,
   [FACTION_RELATIONSHIP.NEUTRAL] = true,
   [FACTION_RELATIONSHIP.HOSTILE] = true,
 }
 
--- ── Reads (O(1) cache) ────────────────────────────────────────────────────────
+local function isPositiveInteger(value)
+  return type(value) == "number" and value > 0 and value == math.floor(value)
+end
+
+local function canonicalPair(factionAId, factionBId)
+  if factionAId < factionBId then return factionAId, factionBId end
+  return factionBId, factionAId
+end
 
 function RPSTACK_FACTIONS_RELATIONSHIPS.getRelationship(factionAId, factionBId)
+  if not isPositiveInteger(factionAId)
+    or not isPositiveInteger(factionBId)
+    or not RPSTACK_FACTIONS_STATE.factions[factionAId]
+    or not RPSTACK_FACTIONS_STATE.factions[factionBId]
+  then
+    return { ok = false, error = RPSTACK_ERRORS.NOT_FOUND }
+  end
   if factionAId == factionBId then
-    -- A faction's relationship with itself is always ally
     return { ok = true, status = FACTION_RELATIONSHIP.ALLY }
   end
 
   local relMap = RPSTACK_FACTIONS_STATE.relationships[factionAId]
-  if not relMap then
-    return { ok = true, status = FACTION_RELATIONSHIP.NEUTRAL }
-  end
-
-  local status = relMap[factionBId] or FACTION_RELATIONSHIP.NEUTRAL
-  return { ok = true, status = status }
+  return {
+    ok = true,
+    status = relMap and relMap[factionBId] or FACTION_RELATIONSHIP.NEUTRAL,
+  }
 end
 
 function RPSTACK_FACTIONS_RELATIONSHIPS.getFactionAllies(factionId)
-  return RPSTACK_FACTIONS_RELATIONSHIPS._getByStatus(factionId, FACTION_RELATIONSHIP.ALLY)
+  return RPSTACK_FACTIONS_RELATIONSHIPS._getByStatus(
+    factionId,
+    FACTION_RELATIONSHIP.ALLY
+  )
 end
 
 function RPSTACK_FACTIONS_RELATIONSHIPS.getFactionHostiles(factionId)
-  return RPSTACK_FACTIONS_RELATIONSHIPS._getByStatus(factionId, FACTION_RELATIONSHIP.HOSTILE)
+  return RPSTACK_FACTIONS_RELATIONSHIPS._getByStatus(
+    factionId,
+    FACTION_RELATIONSHIP.HOSTILE
+  )
 end
 
 function RPSTACK_FACTIONS_RELATIONSHIPS._getByStatus(factionId, status)
-  local relMap = RPSTACK_FACTIONS_STATE.relationships[factionId]
-  if not relMap then return { ok = true, factions = {} } end
+  if not isPositiveInteger(factionId) or not RPSTACK_FACTIONS_STATE.factions[factionId] then
+    return { ok = false, error = RPSTACK_ERRORS.NOT_FOUND }
+  end
 
+  local relMap = RPSTACK_FACTIONS_STATE.relationships[factionId] or {}
   local list = {}
-  for otherFactionId, s in pairs(relMap) do
-    if s == status then
+  for otherFactionId, currentStatus in pairs(relMap) do
+    if currentStatus == status then
       local faction = RPSTACK_FACTIONS_STATE.factions[otherFactionId]
-      if faction then table.insert(list, faction) end
+      if faction then list[#list + 1] = faction end
     end
   end
   return { ok = true, factions = list }
 end
 
--- ── Write ─────────────────────────────────────────────────────────────────────
-
-function RPSTACK_FACTIONS_RELATIONSHIPS.setRelationship(factionAId, factionBId, status, actorCharId)
-  -- Both factions must exist
-  if not RPSTACK_FACTIONS_STATE.factions[factionAId] then
-    return { ok = false, error = RPSTACK_ERRORS.NOT_FOUND }
+function RPSTACK_FACTIONS_RELATIONSHIPS.setRelationship(
+  factionAId,
+  factionBId,
+  status,
+  actorCharId,
+  cb
+)
+  if type(cb) ~= "function" then return end
+  if not isPositiveInteger(factionAId)
+    or not isPositiveInteger(factionBId)
+    or not isPositiveInteger(actorCharId)
+  then
+    cb({ ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED })
+    return
   end
-  if not RPSTACK_FACTIONS_STATE.factions[factionBId] then
-    return { ok = false, error = RPSTACK_ERRORS.NOT_FOUND }
+  if not RPSTACK_FACTIONS_STATE.factions[factionAId]
+    or not RPSTACK_FACTIONS_STATE.factions[factionBId]
+  then
+    cb({ ok = false, error = RPSTACK_ERRORS.NOT_FOUND })
+    return
   end
-  if factionAId == factionBId then
-    return { ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED }
+  if factionAId == factionBId or not VALID_STATUS[status] then
+    cb({ ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED })
+    return
+  end
+  if not RPSTACK_FACTIONS_RANKS.hasPerm(
+    factionAId,
+    actorCharId,
+    FACTION_PERMS.DECLARE
+  ) then
+    cb({ ok = false, error = RPSTACK_ERRORS.NOT_AUTHORIZED })
+    return
   end
 
-  -- Validate status
-  if not VALID_STATUS[status] then
-    return { ok = false, error = RPSTACK_ERRORS.VALIDATION_FAILED }
-  end
-
-  -- Actor must have can_declare in faction A
-  if not RPSTACK_FACTIONS_RANKS.hasPerm(factionAId, actorCharId, FACTION_PERMS.DECLARE) then
-    return { ok = false, error = RPSTACK_ERRORS.NOT_AUTHORIZED }
-  end
-
-  -- Persist (upsert, both directions stored as one canonical row)
-  RPSTACK_FACTIONS_REPO.upsertRelationship(factionAId, factionBId, status, actorCharId, function() end)
-
-  -- Update cache both directions
-  RPSTACK_FACTIONS_CACHE.setRelationship(factionAId, factionBId, status)
-
-  RPSTACK_FACTIONS_AUDIT.log(factionAId, actorCharId, FACTION_AUDIT.RELATIONSHIP_CHANGED, {
-    targetFactionId = factionBId, status = status
-  })
-
-  RPSTACK_LOG.info("factions", "relationship changed", {
-    factionA = factionAId, factionB = factionBId, status = status
-  })
-
-  TriggerEvent(FACTION_EVENTS.RELATIONSHIP_CHANGED, {
-    factionAId = factionAId,
-    factionBId = factionBId,
-    status     = status,
-  })
-
-  return { ok = true }
+  local storedAId, storedBId = canonicalPair(factionAId, factionBId)
+  RPSTACK_FACTIONS_REPO.upsertRelationship(
+    storedAId,
+    storedBId,
+    status,
+    actorCharId,
+    function()
+      RPSTACK_FACTIONS_CACHE.setRelationship(factionAId, factionBId, status)
+      RPSTACK_FACTIONS_AUDIT.log(
+        factionAId,
+        actorCharId,
+        FACTION_AUDIT.RELATIONSHIP_CHANGED,
+        { targetFactionId = factionBId, status = status }
+      )
+      RPSTACK_LOG.info("factions", "relationship changed", {
+        factionA = factionAId,
+        factionB = factionBId,
+        status = status,
+      })
+      TriggerEvent(FACTION_EVENTS.RELATIONSHIP_CHANGED, {
+        factionAId = factionAId,
+        factionBId = factionBId,
+        status = status,
+      })
+      cb({ ok = true })
+    end
+  )
 end

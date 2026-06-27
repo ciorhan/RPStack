@@ -16,14 +16,20 @@ exports['rpstack-persistence']:registerMigration('factions_relationships_v1',
 exports['rpstack-persistence']:registerMigration('factions_audit_log_v1',
   "CREATE TABLE IF NOT EXISTS `rpstack_faction_audit_log` (`id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `faction_id` INT UNSIGNED NOT NULL, `actor_char_id` INT UNSIGNED NOT NULL, `action` VARCHAR(64) NOT NULL, `payload` TEXT, `created_at` BIGINT NOT NULL, INDEX `idx_faction_time` (`faction_id`, `created_at`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4")
 
-AddEventHandler('rpstack:persistence:ready', function()
+exports['rpstack-persistence']:registerMigration('factions_rank_levels_v2',
+  "ALTER TABLE `rpstack_faction_ranks` ADD UNIQUE INDEX IF NOT EXISTS `uq_faction_rank_level` (`faction_id`, `level`)")
+
+local started = false
+
+local function startFactions()
+  if started then return end
+  started = true
+
   CreateThread(function()
     Wait(0)
-
     RPSTACK_LOG.info("factions", "starting")
 
     RPSTACK_FACTIONS_CACHE.hydrate(function()
-
       AddEventHandler('rpstack:identity:characterLoaded', function(data)
         if data and data.characterId then
           RPSTACK_FACTIONS_MEMBERSHIP.onCharacterLoaded(data.characterId)
@@ -36,23 +42,36 @@ AddEventHandler('rpstack:persistence:ready', function()
         end
       end)
 
-      AddEventHandler('playerDropped', function()
-        local src = source
-        local result = exports['rpstack-identity']:getActiveCharacter(src)
-        if result and result.ok and result.character then
-          RPSTACK_FACTIONS_MEMBERSHIP.onCharacterUnloaded(result.character.id)
+      for _, playerId in ipairs(GetPlayers()) do
+        local src = tonumber(playerId)
+        if src then
+          local identity = exports['rpstack-identity']
+          local ok, result = pcall(function()
+            return identity['rpstack:identity:getActiveCharacter'](identity, src)
+          end)
+          if ok and result and result.ok and result.character then
+            RPSTACK_FACTIONS_MEMBERSHIP.onCharacterLoaded(result.character.id)
+          end
         end
-      end)
+      end
 
-      RPSTACK_LOG.info("factions", "ready", {
-        factions = (function()
-          local n = 0
-          for _ in pairs(RPSTACK_FACTIONS_STATE.factions) do n = n + 1 end
-          return n
-        end)()
-      })
+      local factionCount = 0
+      for _ in pairs(RPSTACK_FACTIONS_STATE.factions) do
+        factionCount = factionCount + 1
+      end
 
+      RPSTACK_LOG.info("factions", "ready", { factions = factionCount })
       TriggerEvent(FACTION_EVENTS.READY)
     end)
   end)
+end
+
+AddEventHandler('rpstack:persistence:ready', startFactions)
+
+CreateThread(function()
+  Wait(0)
+  local ok, ready = pcall(function()
+    return exports['rpstack-persistence']:isPersistenceReady()
+  end)
+  if ok and ready then startFactions() end
 end)

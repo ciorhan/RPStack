@@ -30,7 +30,7 @@ RPSTACK_ECONOMY_CONTRACTS = {
   },
 
   -- rpstack:economy:deposit(source, amount, reason, cb)
-  -- Moves amount from cash → bank atomically (two ledger entries).
+  -- Moves amount from cash to bank using two ledger entries.
   deposit = {
     input  = { "source:number", "amount:number", "reason:string", "cb:function" },
     output = { "ok:boolean", "cash:number|nil", "bank:number|nil", "error:string|nil" },
@@ -38,11 +38,49 @@ RPSTACK_ECONOMY_CONTRACTS = {
   },
 
   -- rpstack:economy:withdraw(source, amount, reason, cb)
-  -- Moves amount from bank → cash atomically (two ledger entries).
+  -- Moves amount from bank to cash using two ledger entries.
   withdraw = {
     input  = { "source:number", "amount:number", "reason:string", "cb:function" },
     output = { "ok:boolean", "cash:number|nil", "bank:number|nil", "error:string|nil" },
     async  = true,
+  },
+
+  createAccountForOwner = {
+    input = { "ownerType:string", "ownerId:number", "accountType:string", "cb:function" },
+    output = { "ok:boolean", "account:table|nil", "error:string|nil" },
+    async = true,
+  },
+
+  getAccountByOwner = {
+    input = { "ownerType:string", "ownerId:number", "accountType:string", "cb:function" },
+    output = { "ok:boolean", "account:table|nil", "error:string|nil" },
+    async = true,
+  },
+
+  adjustOwnerCash = {
+    input = { "ownerType:string", "ownerId:number", "accountType:string", "delta:number", "reason:string", "cb:function" },
+    output = { "ok:boolean", "newCash:number|nil", "error:string|nil" },
+    async = true,
+  },
+
+  adjustCashByCharId = {
+    input = { "characterId:number", "delta:number", "reason:string", "cb:function" },
+    output = { "ok:boolean", "newCash:number|nil", "error:string|nil" },
+    async = true,
+  },
+
+  transferCash = {
+    input = {
+      "fromType:string", "fromId:number", "fromAccount:string",
+      "toType:string", "toId:number", "toAccount:string",
+      "amount:number", "reason:string", "cb:function",
+    },
+    output = {
+      "ok:boolean", "sourceCash:number|nil",
+      "destinationCash:number|nil", "error:string|nil",
+    },
+    async = true,
+    notes = "Performs the debit and credit in one atomic SQL update.",
   },
 }
 

@@ -45,7 +45,6 @@ function RPSTACK_IDENTITY_SESSION.onPlayerJoining(src, cb)
       }
       RPSTACK_IDENTITY_STATE.sessions[src] = session
       RPSTACK_LOG.info("identity", "session created", { source = src, account_id = account.id })
-      TriggerEvent('rpstack:identity:sessionCreated', src, account.id)
       cb(session, nil)
     else
       -- New account
@@ -65,15 +64,47 @@ function RPSTACK_IDENTITY_SESSION.onPlayerJoining(src, cb)
         }
         RPSTACK_IDENTITY_STATE.sessions[src] = session
         RPSTACK_LOG.info("identity", "account created", { source = src, account_id = account_id })
-        TriggerEvent('rpstack:identity:sessionCreated', src, account_id)
         cb(session, nil)
       end)
     end
   end)
 end
 
+function RPSTACK_IDENTITY_SESSION.onPlayerJoined(src, oldSrc)
+  local temporarySource = tonumber(oldSrc) or oldSrc
+  local session = RPSTACK_IDENTITY_STATE.sessions[temporarySource]
+  if not session then
+    RPSTACK_LOG.error("identity", "temporary session not found", {
+      source = src,
+      temporarySource = temporarySource,
+    })
+    return false
+  end
+
+  RPSTACK_IDENTITY_STATE.sessions[temporarySource] = nil
+  session.source = src
+  RPSTACK_IDENTITY_STATE.sessions[src] = session
+
+  RPSTACK_LOG.info("identity", "session source assigned", {
+    source = src,
+    temporarySource = temporarySource,
+    account_id = session.account_id,
+  })
+  TriggerEvent('rpstack:identity:sessionCreated', src, session.account_id)
+  return true
+end
+
 function RPSTACK_IDENTITY_SESSION.onPlayerDropped(src, reason)
   local session = RPSTACK_IDENTITY_STATE.sessions[src]
+  local character = RPSTACK_IDENTITY_STATE.activeCharacterBySource[src]
+
+  if character then
+    TriggerEvent('rpstack:identity:characterUnloaded', {
+      source = src,
+      characterId = character.id,
+    })
+  end
+
   RPSTACK_IDENTITY_STATE.sessions[src] = nil
   RPSTACK_IDENTITY_STATE.activeCharacterBySource[src] = nil
 

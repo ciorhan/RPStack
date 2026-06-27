@@ -85,7 +85,19 @@ function RPSTACK_IDENTITY_CHARACTER.selectCharacter(src, char_id, cb)
       return cb({ ok = false, error = RPSTACK_ERRORS.NOT_AUTHORIZED })
     end
 
+    local previous = RPSTACK_IDENTITY_STATE.activeCharacterBySource[src]
+    if previous and previous.id ~= character.id then
+      TriggerEvent('rpstack:identity:characterUnloaded', {
+        source = src,
+        characterId = previous.id,
+      })
+    end
+
     RPSTACK_IDENTITY_STATE.activeCharacterBySource[src] = character
+    TriggerEvent('rpstack:identity:characterLoaded', {
+      source = src,
+      characterId = character.id,
+    })
     cb({ ok = true, character = character })
   end)
 end

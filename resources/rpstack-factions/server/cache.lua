@@ -23,7 +23,7 @@ function RPSTACK_FACTIONS_CACHE.hydrate(cb)
         is_active   = row.is_active == 1,
         created_at  = row.created_at,
       }
-      state.tags[row.tag]             = row.id
+      state.tags[string.upper(row.tag)] = row.id
       state.ranks[row.id]             = {}
       state.rank_by_level[row.id]     = {}
       state.members[row.id]           = {}
@@ -84,7 +84,7 @@ end
 function RPSTACK_FACTIONS_CACHE.addFaction(faction)
   local state = RPSTACK_FACTIONS_STATE
   state.factions[faction.id]      = faction
-  state.tags[faction.tag]         = faction.id
+  state.tags[string.upper(faction.tag)] = faction.id
   state.ranks[faction.id]         = {}
   state.rank_by_level[faction.id] = {}
   state.members[faction.id]       = {}
@@ -95,7 +95,7 @@ end
 function RPSTACK_FACTIONS_CACHE.removeFaction(factionId)
   local state = RPSTACK_FACTIONS_STATE
   local faction = state.factions[factionId]
-  if faction then state.tags[faction.tag] = nil end
+  if faction then state.tags[string.upper(faction.tag)] = nil end
   if state.members[factionId] then
     for charId in pairs(state.members[factionId]) do
       if state.char_factions[charId] then
@@ -119,6 +119,14 @@ function RPSTACK_FACTIONS_CACHE.addRank(factionId, rank)
 end
 
 function RPSTACK_FACTIONS_CACHE.updateRank(factionId, rank)
+  local state = RPSTACK_FACTIONS_STATE
+  local existing = state.ranks[factionId] and state.ranks[factionId][rank.id]
+  if existing
+    and existing.level ~= rank.level
+    and state.rank_by_level[factionId]
+  then
+    state.rank_by_level[factionId][existing.level] = nil
+  end
   RPSTACK_FACTIONS_CACHE.addRank(factionId, rank)
 end
 

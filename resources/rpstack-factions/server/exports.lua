@@ -14,10 +14,17 @@
 --   setRelationship
 --   depositToTreasury, withdrawFromTreasury, getTreasuryBalance, getTreasuryLedger
 
+local function localCallback(callback)
+  if callback == nil then return nil end
+  return function(result)
+    callback(result)
+  end
+end
+
 -- ── Faction CRUD ──────────────────────────────────────────────────────────────
 
 exports('createFaction', function(payload, cb)
-  RPSTACK_FACTIONS_FACTION.createFaction(payload, cb)
+  RPSTACK_FACTIONS_FACTION.createFaction(payload, localCallback(cb))
 end)
 
 exports('getFaction', function(factionId)
@@ -33,25 +40,25 @@ exports('listFactions', function()
 end)
 
 exports('disbandFaction', function(factionId, actorCharId, cb)
-  RPSTACK_FACTIONS_FACTION.disbandFaction(factionId, actorCharId, cb)
+  RPSTACK_FACTIONS_FACTION.disbandFaction(factionId, actorCharId, localCallback(cb))
 end)
 
 -- ── Membership ────────────────────────────────────────────────────────────────
 
 exports('joinFaction', function(factionId, characterId, rankId, actorCharId, cb)
-  RPSTACK_FACTIONS_MEMBERSHIP.joinFaction(factionId, characterId, rankId, actorCharId, cb)
+  RPSTACK_FACTIONS_MEMBERSHIP.joinFaction(factionId, characterId, rankId, actorCharId, localCallback(cb))
 end)
 
 exports('leaveFaction', function(factionId, characterId, cb)
-  RPSTACK_FACTIONS_MEMBERSHIP.leaveFaction(factionId, characterId, cb)
+  RPSTACK_FACTIONS_MEMBERSHIP.leaveFaction(factionId, characterId, localCallback(cb))
 end)
 
 exports('kickMember', function(factionId, characterId, actorCharId, cb)
-  RPSTACK_FACTIONS_MEMBERSHIP.kickMember(factionId, characterId, actorCharId, cb)
+  RPSTACK_FACTIONS_MEMBERSHIP.kickMember(factionId, characterId, actorCharId, localCallback(cb))
 end)
 
 exports('setMemberRank', function(factionId, characterId, rankId, actorCharId, cb)
-  RPSTACK_FACTIONS_MEMBERSHIP.setMemberRank(factionId, characterId, rankId, actorCharId, cb)
+  RPSTACK_FACTIONS_MEMBERSHIP.setMemberRank(factionId, characterId, rankId, actorCharId, localCallback(cb))
 end)
 
 exports('getCharacterFactions', function(characterId)
@@ -83,11 +90,11 @@ end)
 -- ── Ranks ─────────────────────────────────────────────────────────────────────
 
 exports('createRank', function(factionId, payload, actorCharId, cb)
-  RPSTACK_FACTIONS_RANKS.createRank(factionId, payload, actorCharId, cb)
+  RPSTACK_FACTIONS_RANKS.createRank(factionId, payload, actorCharId, localCallback(cb))
 end)
 
 exports('updateRank', function(factionId, rankId, payload, actorCharId, cb)
-  RPSTACK_FACTIONS_RANKS.updateRank(factionId, rankId, payload, actorCharId, cb)
+  RPSTACK_FACTIONS_RANKS.updateRank(factionId, rankId, payload, actorCharId, localCallback(cb))
 end)
 
 exports('getRanks', function(factionId)
@@ -97,7 +104,7 @@ end)
 -- ── Relationships ─────────────────────────────────────────────────────────────
 
 exports('setRelationship', function(factionAId, factionBId, status, actorCharId, cb)
-  RPSTACK_FACTIONS_RELATIONSHIPS.setRelationship(factionAId, factionBId, status, actorCharId, cb)
+  RPSTACK_FACTIONS_RELATIONSHIPS.setRelationship(factionAId, factionBId, status, actorCharId, localCallback(cb))
 end)
 
 exports('getRelationship', function(factionAId, factionBId)
@@ -115,17 +122,17 @@ end)
 -- ── Treasury (async) ──────────────────────────────────────────────────────────
 
 exports('depositToTreasury', function(factionId, characterId, amount, note, cb)
-  RPSTACK_FACTIONS_TREASURY.deposit(factionId, characterId, amount, note, cb)
+  RPSTACK_FACTIONS_TREASURY.deposit(factionId, characterId, amount, note, localCallback(cb))
 end)
 
 exports('withdrawFromTreasury', function(factionId, characterId, amount, note, cb)
-  RPSTACK_FACTIONS_TREASURY.withdraw(factionId, characterId, amount, note, cb)
+  RPSTACK_FACTIONS_TREASURY.withdraw(factionId, characterId, amount, note, localCallback(cb))
 end)
 
 exports('getTreasuryBalance', function(factionId, cb)
-  RPSTACK_FACTIONS_TREASURY.getBalance(factionId, cb)
+  RPSTACK_FACTIONS_TREASURY.getBalance(factionId, localCallback(cb))
 end)
 
 exports('getTreasuryLedger', function(factionId, limit, cb)
-  RPSTACK_FACTIONS_TREASURY.getLedger(factionId, limit, cb)
+  RPSTACK_FACTIONS_TREASURY.getLedger(factionId, limit, localCallback(cb))
 end)

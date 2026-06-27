@@ -29,6 +29,11 @@ FACTION_PERMS = {
   DECLARE  = "can_declare",   -- declare war or alliance
 }
 
+FACTION_PERMS_SET = {}
+for _, permission in pairs(FACTION_PERMS) do
+  FACTION_PERMS_SET[permission] = true
+end
+
 FACTION_RELATIONSHIP = {
   ALLY    = "ally",
   NEUTRAL = "neutral",

@@ -45,4 +45,10 @@ RPSTACK_IDENTITY_CONTRACTS = {
     output = { "ok:boolean", "character:table|nil" },
     async  = false,
   },
+
+  getCharacterById = {
+    input = { "characterId:number", "cb:function" },
+    output = { "ok:boolean", "character:table|nil", "error:string|nil" },
+    async = true,
+  },
 }
