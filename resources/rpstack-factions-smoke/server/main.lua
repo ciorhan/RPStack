@@ -20,6 +20,8 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
     return
   end
 
+  print(('[SMOKE] starting with characterId=%d'):format(characterId))
+
   local suffix = os.time() % 1000000
   local factions = exports['rpstack-factions']
   local economy = exports['rpstack-economy']
