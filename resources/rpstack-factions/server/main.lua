@@ -45,8 +45,9 @@ local function startFactions()
       for _, playerId in ipairs(GetPlayers()) do
         local src = tonumber(playerId)
         if src then
+          local identity = exports['rpstack-identity']
           local ok, result = pcall(function()
-            return exports['rpstack-identity']['rpstack:identity:getActiveCharacter'](src)
+            return identity['rpstack:identity:getActiveCharacter'](identity, src)
           end)
           if ok and result and result.ok and result.character then
             RPSTACK_FACTIONS_MEMBERSHIP.onCharacterLoaded(result.character.id)
