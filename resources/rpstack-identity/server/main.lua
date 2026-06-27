@@ -26,6 +26,11 @@ AddEventHandler('rpstack:persistence:ready', function()
       end)
     end)
 
+    AddEventHandler('playerJoining', function(oldSrc)
+      local src = source
+      RPSTACK_IDENTITY_SESSION.onPlayerJoined(src, oldSrc)
+    end)
+
     AddEventHandler('playerDropped', function(reason)
       local src = source
       RPSTACK_IDENTITY_SESSION.onPlayerDropped(src, reason)
