@@ -1,0 +1,95 @@
+if GetConvarInt('rpstack:smoke:enabled', 0) ~= 1 then
+  print('[rpstack-factions-smoke] disabled')
+  return
+end
+
+local function printResult(stage, result)
+  print(('[SMOKE] %s: %s'):format(stage, json.encode(result or {})))
+  return result and result.ok == true
+end
+
+RegisterCommand('rpstack_factions_smoke', function(source, args)
+  if source ~= 0 then
+    print('[SMOKE] Run this command from the FXServer console.')
+    return
+  end
+
+  local characterId = tonumber(args[1])
+  if not characterId or characterId <= 0 or characterId ~= math.floor(characterId) then
+    print('[SMOKE] Usage: rpstack_factions_smoke <characterId>')
+    return
+  end
+
+  local suffix = os.time() % 1000000
+  local factions = exports['rpstack-factions']
+  local economy = exports['rpstack-economy']
+
+  factions:createFaction({
+    name = ('Smoke Test %06d'):format(suffix),
+    tag = ('T%06d'):format(suffix),
+    type = 'guild',
+    founderCharId = characterId,
+  }, function(created)
+    if not printResult('createFaction', created) then return end
+    local factionId = created.faction.id
+
+    economy['rpstack:economy:adjustCashByCharId'](
+      economy,
+      characterId,
+      500,
+      'factions_smoke_funding',
+      function(funded)
+        if not printResult('fundCharacter', funded) then return end
+
+        factions:depositToTreasury(
+          factionId,
+          characterId,
+          200,
+          'smoke deposit',
+          function(deposited)
+            if not printResult('deposit', deposited) then return end
+
+            factions:withdrawFromTreasury(
+              factionId,
+              characterId,
+              75,
+              'smoke withdrawal',
+              function(withdrawn)
+                if not printResult('withdraw', withdrawn) then return end
+
+                factions:getTreasuryBalance(factionId, function(balance)
+                  if not printResult('balance', balance) then return end
+
+                  factions:getTreasuryLedger(factionId, 10, function(ledger)
+                    if not printResult('ledger', ledger) then return end
+
+                    factions:depositToTreasury(
+                      factionId,
+                      characterId,
+                      1000000,
+                      'expected insufficient funds',
+                      function(rejected)
+                        if rejected and rejected.ok then
+                          print('[SMOKE] FAIL: insufficient-funds deposit succeeded')
+                          return
+                        end
+
+                        print(('[SMOKE] PASS factionId=%d treasury=%d ledgerEntries=%d'):format(
+                          factionId,
+                          balance.cash,
+                          #ledger.entries
+                        ))
+                      end
+                    )
+                  end)
+                end)
+              end
+            )
+          end
+        )
+      end
+    )
+  end)
+end, false)
+
+print('[rpstack-factions-smoke] ready: rpstack_factions_smoke <characterId>')
