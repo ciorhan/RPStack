@@ -85,7 +85,7 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
   local factions = exports['rpstack-factions']
   local economy = exports['rpstack-economy']
 
-  factions['createFaction'](factions, {
+  factions['createFaction']({
     name = ('Smoke Test %06d'):format(suffix),
     tag = ('T%06d'):format(suffix),
     type = 'guild',
@@ -103,7 +103,7 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
       function(funded)
         if not printResult('fundCharacter', funded) then return end
 
-        factions['depositToTreasury'](factions, 
+        factions['depositToTreasury'](
           factionId,
           characterId,
           200,
@@ -111,7 +111,7 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
           function(deposited)
             if not printResult('deposit', deposited) then return end
 
-            factions['withdrawFromTreasury'](factions, 
+            factions['withdrawFromTreasury'](
               factionId,
               characterId,
               75,
@@ -119,18 +119,18 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
               function(withdrawn)
                 if not printResult('withdraw', withdrawn) then return end
 
-                factions['getTreasuryBalance'](factions, factionId, function(balance)
+                factions['getTreasuryBalance'](factionId, function(balance)
                   if not printResult('balance', balance) then return end
 
                   SetTimeout(500, function()
-                    factions['getTreasuryLedger'](factions, factionId, 10, function(ledger)
+                    factions['getTreasuryLedger'](factionId, 10, function(ledger)
                       if not printResult('ledger', ledger) then return end
                       if balance.cash ~= 125 or #ledger.entries < 2 then
                         print('[SMOKE] FAIL: unexpected balance or missing audit entries')
                         return
                       end
 
-                      factions['depositToTreasury'](factions, 
+                      factions['depositToTreasury'](
                         factionId,
                         characterId,
                         1000000,
@@ -178,7 +178,7 @@ RegisterCommand('rpstack_factions_relationship_smoke', function(source, args)
 
   local suffix = os.time() % 1000000
   local factions = exports['rpstack-factions']
-  factions['createFaction'](factions, {
+  factions['createFaction']({
     name = ('Relationship Test %06d'):format(suffix),
     tag = ('R%06d'):format(suffix),
     type = 'guild',
@@ -187,7 +187,7 @@ RegisterCommand('rpstack_factions_relationship_smoke', function(source, args)
     if not printResult('createRelationshipFaction', created) then return end
     local secondFactionId = created.faction.id
 
-    factions['setRelationship'](factions, 
+    factions['setRelationship'](
       firstFactionId,
       secondFactionId,
       'hostile',
@@ -195,8 +195,8 @@ RegisterCommand('rpstack_factions_relationship_smoke', function(source, args)
       function(updated)
         if not printResult('setRelationship', updated) then return end
 
-        local forward = factions['getRelationship'](factions, firstFactionId, secondFactionId)
-        local reverse = factions['getRelationship'](factions, secondFactionId, firstFactionId)
+        local forward = factions['getRelationship'](firstFactionId, secondFactionId)
+        local reverse = factions['getRelationship'](secondFactionId, firstFactionId)
         if not forward.ok
           or not reverse.ok
           or forward.status ~= 'hostile'
