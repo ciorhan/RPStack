@@ -1,5 +1,6 @@
 fx_version 'cerulean'
 game 'rdr3'
+lua54 'yes'
 
 name 'rpstack-core'
 author 'RPStack'
