@@ -232,8 +232,9 @@ rpstack_economy_accounts
 - Character accounts: `owner_type='character'`, `owner_id=char_id`
 - Faction treasury: `owner_type='faction'`, `owner_id=faction_id`, `account_type='treasury'`
 - All money mutations go through `RPSTACK_LEDGER.apply()` for character accounts
-- Non-character accounts use `RPSTACK_ECONOMY_ACCOUNTS.adjustOwnerCash()`
-- Never mutate balances with a raw UPDATE outside these functions
+- Single-account non-character changes use `RPSTACK_ECONOMY_ACCOUNTS.adjustOwnerCash()`
+- Cross-owner movements use `RPSTACK_ECONOMY_ACCOUNTS.transferCash()` so debit and credit happen atomically
+- Never mutate balances with a raw UPDATE outside the economy repository
 
 ---
 
@@ -254,6 +255,7 @@ exports['rpstack-economy']['rpstack:economy:adjustCashByCharId'](econ, character
 exports['rpstack-economy']['rpstack:economy:createAccountForOwner'](econ, ownerType, ownerId, accountType, cb)
 exports['rpstack-economy']['rpstack:economy:getAccountByOwner'](econ, ownerType, ownerId, accountType, cb)
 exports['rpstack-economy']['rpstack:economy:adjustOwnerCash'](econ, ownerType, ownerId, accountType, delta, reason, cb)
+exports['rpstack-economy']['rpstack:economy:transferCash'](econ, fromType, fromId, fromAccountType, toType, toId, toAccountType, amount, reason, cb)
 
 -- Callback shape for all money operations:
 -- cb({ ok=bool, cash=number|nil, bank=number|nil, error=string|nil })
