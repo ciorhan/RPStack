@@ -1,3 +1,5 @@
+server.cfg
+
 # Compiled Lua sources
 luac.out
 

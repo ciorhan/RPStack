@@ -1,0 +1,25 @@
+# RPStack server.cfg
+# Minimal configuration to run the framework.
+# Place this file in your server root (same folder as FXServer).
+
+# oxmysql connection string — update with your DB credentials
+set mysql_connection_string "mysql://rpstack:change_me@127.0.0.1/rpstack_dev?waitForConnections=true"
+
+# RPStack environment
+set rpstack:env "dev"
+set rpstack:logLevel "info"
+
+# Economy defaults (optional overrides)
+# set rpstack:economy:startingCash "500"
+# set rpstack:economy:startingBank "0"
+# set rpstack:economy:maxTransaction "1000000"
+
+# Identity defaults (optional overrides)
+# set rpstack:identity:autoCreateCharacter "false"
+
+# ─── Resource load order (do not change order) ───────────────────────────────
+ensure oxmysql
+ensure rpstack-core
+ensure rpstack-persistence
+ensure rpstack-identity
+ensure rpstack-economy
