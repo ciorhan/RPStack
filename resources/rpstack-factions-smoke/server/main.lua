@@ -152,6 +152,7 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
   end)
 end, false)
 
+print('[rpstack-factions-smoke] ready: rpstack_identity_smoke <playerSource>')
 print('[rpstack-factions-smoke] ready: rpstack_factions_smoke <characterId>')
 
 RegisterCommand('rpstack_factions_relationship_smoke', function(source, args)
