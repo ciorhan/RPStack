@@ -1,6 +1,13 @@
 -- All exports are async. Callers must provide a callback.
 -- Never call balance mutations directly — always go through these exports.
 
+local function localCallback(callback)
+  if callback == nil then return nil end
+  return function(result)
+    callback(result)
+  end
+end
+
 local function getChar(src)
   local identity = exports['rpstack-identity']
   local result = identity['rpstack:identity:getActiveCharacter'](identity, src)
@@ -60,23 +67,23 @@ end)
  
 -- Create an economy account for any owning entity (faction, town, etc.)
 exports('rpstack:economy:createAccountForOwner', function(ownerType, ownerId, accountType, cb)
-  RPSTACK_ECONOMY_ACCOUNTS.createAccountForOwner(ownerType, ownerId, accountType, cb)
+  RPSTACK_ECONOMY_ACCOUNTS.createAccountForOwner(ownerType, ownerId, accountType, localCallback(cb))
 end)
  
 -- Retrieve an account by owner
 exports('rpstack:economy:getAccountByOwner', function(ownerType, ownerId, accountType, cb)
-  RPSTACK_ECONOMY_ACCOUNTS.getAccountByOwner(ownerType, ownerId, accountType, cb)
+  RPSTACK_ECONOMY_ACCOUNTS.getAccountByOwner(ownerType, ownerId, accountType, localCallback(cb))
 end)
  
 -- Adjust cash balance for any non-character owner (faction treasury, etc.)
 -- delta: positive = add, negative = subtract
 exports('rpstack:economy:adjustOwnerCash', function(ownerType, ownerId, accountType, delta, reason, cb)
-  RPSTACK_ECONOMY_ACCOUNTS.adjustOwnerCash(ownerType, ownerId, accountType, delta, reason, cb)
+  RPSTACK_ECONOMY_ACCOUNTS.adjustOwnerCash(ownerType, ownerId, accountType, delta, reason, localCallback(cb))
 end)
  
 -- Adjust cash by character id — for systems operating without a live source (treasury, automation)
 exports('rpstack:economy:adjustCashByCharId', function(characterId, delta, reason, cb)
-  RPSTACK_ECONOMY_ACCOUNTS.adjustCashByCharId(characterId, delta, reason, cb)
+  RPSTACK_ECONOMY_ACCOUNTS.adjustCashByCharId(characterId, delta, reason, localCallback(cb))
 end)
 
 -- Transfer cash between two owner accounts with one atomic balance update.
@@ -100,6 +107,6 @@ exports('rpstack:economy:transferCash', function(
     toAccount,
     amount,
     reason,
-    cb
+    localCallback(cb)
   )
 end)
