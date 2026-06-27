@@ -19,14 +19,17 @@ exports['rpstack-persistence']:registerMigration('factions_audit_log_v1',
 exports['rpstack-persistence']:registerMigration('factions_rank_levels_v2',
   "ALTER TABLE `rpstack_faction_ranks` ADD UNIQUE INDEX IF NOT EXISTS `uq_faction_rank_level` (`faction_id`, `level`)")
 
-AddEventHandler('rpstack:persistence:ready', function()
+local started = false
+
+local function startFactions()
+  if started then return end
+  started = true
+
   CreateThread(function()
     Wait(0)
-
     RPSTACK_LOG.info("factions", "starting")
 
     RPSTACK_FACTIONS_CACHE.hydrate(function()
-
       AddEventHandler('rpstack:identity:characterLoaded', function(data)
         if data and data.characterId then
           RPSTACK_FACTIONS_MEMBERSHIP.onCharacterLoaded(data.characterId)
@@ -38,7 +41,6 @@ AddEventHandler('rpstack:persistence:ready', function()
           RPSTACK_FACTIONS_MEMBERSHIP.onCharacterUnloaded(data.characterId)
         end
       end)
-
 
       for _, playerId in ipairs(GetPlayers()) do
         local src = tonumber(playerId)
@@ -52,15 +54,23 @@ AddEventHandler('rpstack:persistence:ready', function()
         end
       end
 
-      RPSTACK_LOG.info("factions", "ready", {
-        factions = (function()
-          local n = 0
-          for _ in pairs(RPSTACK_FACTIONS_STATE.factions) do n = n + 1 end
-          return n
-        end)()
-      })
+      local factionCount = 0
+      for _ in pairs(RPSTACK_FACTIONS_STATE.factions) do
+        factionCount = factionCount + 1
+      end
 
+      RPSTACK_LOG.info("factions", "ready", { factions = factionCount })
       TriggerEvent(FACTION_EVENTS.READY)
     end)
   end)
+end
+
+AddEventHandler('rpstack:persistence:ready', startFactions)
+
+CreateThread(function()
+  Wait(0)
+  local ok, ready = pcall(function()
+    return exports['rpstack-persistence']:isPersistenceReady()
+  end)
+  if ok and ready then startFactions() end
 end)
