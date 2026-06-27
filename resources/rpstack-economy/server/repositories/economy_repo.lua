@@ -68,10 +68,14 @@ function RPSTACK_ECONOMY_REPO.logTransaction(char_id, account, amount, reason, b
 end
 
 function RPSTACK_ECONOMY_REPO.logOwnerTransaction(owner_type, owner_id, account_type, amount, reason, balance_after, cb)
-  local char_id = owner_type == "character" and owner_id or nil
+  if owner_type == "character" then
+    RPSTACK_ECONOMY_REPO.logTransaction(owner_id, "cash", amount, reason, balance_after, cb)
+    return
+  end
+
   RPSTACK_DB.insert(
-    "INSERT INTO `rpstack_economy_transactions` (char_id, owner_type, owner_id, account_type, account, amount, reason, balance_after) VALUES (?, ?, ?, ?, 'cash', ?, ?, ?)",
-    { char_id, owner_type, owner_id, account_type, amount, reason, balance_after },
+    "INSERT INTO `rpstack_economy_transactions` (char_id, owner_type, owner_id, account_type, account, amount, reason, balance_after) VALUES (NULL, ?, ?, ?, 'cash', ?, ?, ?)",
+    { owner_type, owner_id, account_type, amount, reason, balance_after },
     cb
   )
 end
