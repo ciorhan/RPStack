@@ -1,9 +1,25 @@
--- Expose migration registration to other resources.
-exports('rpstack:persistence:registerMigration', function(resource, name, sql)
-  RPSTACK_MIGRATIONS.register(resource, name, sql)
+-- Migration registration
+exports('registerMigration', function(name, sql)
+  RPSTACK_MIGRATIONS.register(name, sql)
 end)
 
--- Expose a ready-check so dependent resources can confirm persistence is up.
-exports('rpstack:persistence:isReady', function()
+exports('isPersistenceReady', function()
   return RPSTACK_PERSISTENCE_READY == true
+end)
+
+-- DB proxy exports — allows other resources to use RPSTACK_DB via exports
+exports('dbQuery', function(sql, params, cb)
+  RPSTACK_DB.query(sql, params, cb)
+end)
+
+exports('dbSingle', function(sql, params, cb)
+  RPSTACK_DB.single(sql, params, cb)
+end)
+
+exports('dbExecute', function(sql, params, cb)
+  RPSTACK_DB.execute(sql, params, cb)
+end)
+
+exports('dbInsert', function(sql, params, cb)
+  RPSTACK_DB.insert(sql, params, cb)
 end)
