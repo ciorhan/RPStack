@@ -9,6 +9,10 @@ version '0.0.1'
 
 dependency 'rpstack-core'
 
+shared_scripts {
+  'shared/*.lua',
+}
+
 server_scripts {
   '@oxmysql/lib/MySQL.lua',
   'config/server.lua',
@@ -18,6 +22,3 @@ server_scripts {
   'server/main.lua',
 }
 
-shared_scripts {
-  'shared/*.lua',
-}

@@ -11,6 +11,10 @@ dependency 'rpstack-core'
 dependency 'rpstack-persistence'
 dependency 'rpstack-identity'
 
+shared_scripts {
+  'shared/*.lua',
+}
+
 server_scripts {
   'config/server.lua',
   'server/repositories/economy_repo.lua',
@@ -19,6 +23,3 @@ server_scripts {
   'server/main.lua',
 }
 
-shared_scripts {
-  'shared/*.lua',
-}
