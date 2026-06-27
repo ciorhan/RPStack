@@ -60,27 +60,33 @@ RegisterCommand('rpstack_factions_smoke', function(source, args)
                 factions:getTreasuryBalance(factionId, function(balance)
                   if not printResult('balance', balance) then return end
 
-                  factions:getTreasuryLedger(factionId, 10, function(ledger)
-                    if not printResult('ledger', ledger) then return end
-
-                    factions:depositToTreasury(
-                      factionId,
-                      characterId,
-                      1000000,
-                      'expected insufficient funds',
-                      function(rejected)
-                        if rejected and rejected.ok then
-                          print('[SMOKE] FAIL: insufficient-funds deposit succeeded')
-                          return
-                        end
-
-                        print(('[SMOKE] PASS factionId=%d treasury=%d ledgerEntries=%d'):format(
-                          factionId,
-                          balance.cash,
-                          #ledger.entries
-                        ))
+                  SetTimeout(500, function()
+                    factions:getTreasuryLedger(factionId, 10, function(ledger)
+                      if not printResult('ledger', ledger) then return end
+                      if balance.cash ~= 125 or #ledger.entries < 2 then
+                        print('[SMOKE] FAIL: unexpected balance or missing audit entries')
+                        return
                       end
-                    )
+
+                      factions:depositToTreasury(
+                        factionId,
+                        characterId,
+                        1000000,
+                        'expected insufficient funds',
+                        function(rejected)
+                          if rejected and rejected.ok then
+                            print('[SMOKE] FAIL: insufficient-funds deposit succeeded')
+                            return
+                          end
+
+                          print(('[SMOKE] PASS factionId=%d treasury=%d ledgerEntries=%d'):format(
+                            factionId,
+                            balance.cash,
+                            #ledger.entries
+                          ))
+                        end
+                      )
+                    end)
                   end)
                 end)
               end
