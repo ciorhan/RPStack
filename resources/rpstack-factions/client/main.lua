@@ -1,0 +1,3 @@
+-- rpstack-factions/client/main.lua
+-- Client is untrusted. All faction state lives server-side.
+-- NUI and UI scripts should trigger server events/exports — never mutate state here.

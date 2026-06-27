@@ -55,3 +55,25 @@ exports('rpstack:economy:withdraw', function(src, amount, reason, cb)
     RPSTACK_LEDGER.apply(char.id, "cash", amount, reason or "withdraw", cb)
   end)
 end)
+ 
+-- Create an economy account for any owning entity (faction, town, etc.)
+exports('rpstack:economy:createAccountForOwner', function(ownerType, ownerId, accountType, cb)
+  RPSTACK_ECONOMY_ACCOUNTS.createAccountForOwner(ownerType, ownerId, accountType, cb)
+end)
+ 
+-- Retrieve an account by owner
+exports('rpstack:economy:getAccountByOwner', function(ownerType, ownerId, accountType, cb)
+  RPSTACK_ECONOMY_ACCOUNTS.getAccountByOwner(ownerType, ownerId, accountType, cb)
+end)
+ 
+-- Adjust cash balance for any non-character owner (faction treasury, etc.)
+-- delta: positive = add, negative = subtract
+exports('rpstack:economy:adjustOwnerCash', function(ownerType, ownerId, accountType, delta, reason, cb)
+  RPSTACK_ECONOMY_ACCOUNTS.adjustOwnerCash(ownerType, ownerId, accountType, delta, reason, cb)
+end)
+ 
+-- Adjust cash by character id — for systems operating without a live source (treasury, automation)
+exports('rpstack:economy:adjustCashByCharId', function(characterId, delta, reason, cb)
+  RPSTACK_ECONOMY_ACCOUNTS.adjustCashByCharId(characterId, delta, reason, cb)
+end)
+ 
