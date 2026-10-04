@@ -15,21 +15,20 @@ for %%N in (rpstack-core rpstack-persistence rpstack-vorp-bridge) do (
     )
 )
 
-set "SMOKE_LINK=%SERVER%\rpstack-vorp-bridge-smoke"
-set "SMOKE_TARGET=%TESTS%\rpstack-vorp-bridge-smoke"
-
-rem The smoke resource lives under tests but keeps its FXServer resource name.
+rem Smoke resources live under tests but keep their FXServer resource names.
+rem The peer is part of the bridge smoke (second resource for cross-resource checks).
 rem Remove only an existing reparse point; never replace a real directory.
-fsutil reparsepoint query "%SMOKE_LINK%" >nul 2>&1
-if not errorlevel 1 (
-    echo UPDATE: rpstack-vorp-bridge-smoke junction
-    rmdir "%SMOKE_LINK%"
-)
-
-if exist "%SMOKE_LINK%" (
-    echo ERROR: %SMOKE_LINK% exists and is not a junction
-) else (
-    mklink /J "%SMOKE_LINK%" "%SMOKE_TARGET%"
+for %%S in (rpstack-vorp-bridge-smoke rpstack-vorp-bridge-smoke-peer) do (
+    fsutil reparsepoint query "%SERVER%\%%S" >nul 2>&1
+    if not errorlevel 1 (
+        echo UPDATE: %%S junction
+        rmdir "%SERVER%\%%S"
+    )
+    if exist "%SERVER%\%%S" (
+        echo ERROR: %SERVER%\%%S exists and is not a junction
+    ) else (
+        mklink /J "%SERVER%\%%S" "%TESTS%\%%S"
+    )
 )
 
 echo Done.
