@@ -4,6 +4,8 @@
 
 A modular, server-authoritative RedM roleplay framework. Core + modules model. Greenfield — no FiveM carryover. Loose VORP/RSG export compatibility is a goal. 1890s frontier setting, player-driven economy, faction-based power.
 
+**VORP deployment (Frontier Hegemony):** VORP Core is the base framework and RPStack provides gameplay modules on top ([ADR-005](docs/architecture/adr/ADR-005-vorp-base-framework.md)). On that deployment, `rpstack-identity` and `rpstack-permissions` do not run; `rpstack-vorp-bridge` is the only RPStack resource that calls VORP APIs. Characters are keyed by VORP `charidentifier` ([ADR-006](docs/architecture/adr/ADR-006-vorp-identity-keys.md)), staff checks are ACE-only ([ADR-009](docs/architecture/adr/ADR-009-staff-authority-ace.md)), and VORP callbacks, state bags, `vorp_NewCharacter`, and `vorp:ImDead` are never trusted ([ADR-011](docs/architecture/adr/ADR-011-untrusted-vorp-channels.md)). See the [VORP analysis](docs/integration/vorp-analysis.md).
+
 ## Stack
 
 - Runtime: RedM / Cfx.re (CfxLua, Lua 5.4)
@@ -21,8 +23,10 @@ resources/
   rpstack-economy/      cash + bank balances, transaction log
   rpstack-permissions/  roles, policy checks, superadmin bypass
   rpstack-factions/     multi-faction membership, ranks, relationships, treasury
+  rpstack-vorp-bridge/  VORP deployments only: identity-compatible exports over VORP
 tests/
   rpstack-factions-smoke/  guarded console-only FXServer smoke resource
+  rpstack-vorp-bridge-smoke/  guarded console-only smoke for the VORP bridge
   unit/                     deterministic Lua regression tests
 ```
 
@@ -365,6 +369,8 @@ Each non-core resource must have:
 
 ## Identity model
 
+On VORP deployments, VORP's Steam identifier is the account identity and `charidentifier` is the cross-module character key; there is no RPStack `account_id` ([ADR-006](docs/architecture/adr/ADR-006-vorp-identity-keys.md)). The rules below apply to non-VORP deployments.
+
 - Primary identifier: `license2 → license → fivem` fallback chain
 - Internal key: `account_id` (DB auto-increment) — all cross-module references use this
 - Sessions are in-memory. Accounts and characters are persisted.
@@ -383,6 +389,8 @@ See the detailed [rank](docs/architecture/overview.md#faction-rank-authorization
 ---
 
 ## server.cfg load order
+
+Standalone (non-VORP) order below. On the VORP deployment, ensure `rpstack-core`, `rpstack-persistence`, and `rpstack-vorp-bridge` after the VORP resources; identity, permissions, economy, and factions are not ensured yet.
 
 ```
 stop sessionmanager

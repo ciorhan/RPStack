@@ -19,12 +19,28 @@ Why this over the alternatives.
 What becomes easier. What becomes harder.
 ```
 
+## Index
+
+| ADR | Title | Status |
+| --- | --- | --- |
+| ADR-001 | Internal account_id decoupled from Cfx identifiers (below) | Accepted; superseded by ADR-006 for VORP deployments |
+| ADR-002 | No ox_lib dependency in v0 (below) | Accepted |
+| ADR-003 | oxmysql + MySQL/MariaDB as sole DB driver (below) | Accepted |
+| ADR-004 | Multi-character supported from v0 (below) | Accepted |
+| [ADR-005](ADR-005-vorp-base-framework.md) | VORP Core is the base framework | Accepted |
+| [ADR-006](ADR-006-vorp-identity-keys.md) | VORP Steam identity and charidentifier as keys | Accepted |
+| [ADR-007](ADR-007-economy-owner-accounts-and-bridge-cash.md) | Slim economy to owner accounts; bridge performs character cash | Accepted (implementation pending) |
+| [ADR-008](ADR-008-vorp-patch-policy.md) | VORP pinning and patch policy | Accepted |
+| [ADR-009](ADR-009-staff-authority-ace.md) | Staff authority is ACE only | Accepted |
+| [ADR-010](ADR-010-dollars-only.md) | Dollars only for RPStack money paths | Accepted |
+| [ADR-011](ADR-011-untrusted-vorp-channels.md) | Untrusted VORP channels | Accepted |
+
 ---
 
 # ADR-001: Internal account_id decoupled from Cfx identifiers
 
 Date: 2026-06-27
-Status: Accepted
+Status: Accepted. Superseded by [ADR-006](ADR-006-vorp-identity-keys.md) for VORP deployments.
 
 ## Decision
 

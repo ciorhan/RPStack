@@ -4,6 +4,10 @@
 
 RPStack is built as **core + modules**. Core provides the runtime foundation. Modules provide gameplay systems behind stable exports. Modules never reach into each other's internals or tables.
 
+## VORP deployment
+
+Frontier Hegemony runs RPStack on top of VORP Core ([ADR-005](adr/ADR-005-vorp-base-framework.md)). There, VORP owns accounts, characters, character money, and inventory; `rpstack-identity` and `rpstack-permissions` do not run; and `rpstack-vorp-bridge` exposes identity-compatible exports (`rpstack:identity:getActiveCharacter`, `rpstack:identity:getCharacterById`, and the `characterLoaded`/`characterUnloaded` events) over VORP. The bridge's single read-only query of VORP's `characters` table is the one sanctioned cross-module read. The sections below describe the standalone resource set; the economy slimming for VORP is recorded in [ADR-007](adr/ADR-007-economy-owner-accounts-and-bridge-cash.md) and not yet implemented. See the [VORP analysis](../integration/vorp-analysis.md).
+
 ## Resources and responsibilities
 
 ```text
