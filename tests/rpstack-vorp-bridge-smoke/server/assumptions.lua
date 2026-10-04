@@ -156,73 +156,16 @@ RegisterCommand('rpstack_vorp_assume3', function(source, args)
   end)
 end, false)
 
--- ── A4: CancelEvent in one resource vs another resource's handler ─────────────
+-- ── A4: retired ────────────────────────────────────────────────────────────────
+-- The CancelEvent "shield resource" approach is rejected (ADR-008): even if
+-- CancelEvent crossed resources, the result would depend on handler order.
+-- The live run was inconclusive (the peer handler ran first). Security fixes go
+-- through the VORP patch series instead. See docs/integration/vorp-analysis.md
+-- "Runtime verification".
 
-local cancelProbe = { token = nil, src = nil, smokeRan = {}, peer = {} }
-
-local function smokeCancelHandler(eventName, token, src)
-  if token ~= cancelProbe.token then return end
-  if src and src ~= cancelProbe.src then return end
-  cancelProbe.smokeRan[eventName] = true
-  CancelEvent()
-end
-
-AddEventHandler(VSMOKE.LOCAL_CANCEL_PROBE, function(token)
-  smokeCancelHandler(VSMOKE.LOCAL_CANCEL_PROBE, token, nil)
-end)
-
-RegisterNetEvent(VSMOKE.NET_CANCEL_PROBE, function(token)
-  local src = source
-  smokeCancelHandler(VSMOKE.NET_CANCEL_PROBE, token, src)
-end)
-
-AddEventHandler(VSMOKE.PEER_RESULT, function(result)
-  if GetInvokingResource() ~= VSMOKE.PEER_RESOURCE then return end
-  if type(result) ~= 'table' or result.token ~= cancelProbe.token then return end
-  cancelProbe.peer[result.event] = { ran = true, sawCanceled = result.sawCanceled == true }
-end)
-
-local function evaluateCancel(eventName)
-  local smokeRan = cancelProbe.smokeRan[eventName] == true
-  local peer = cancelProbe.peer[eventName]
-  local finding, determined
-  if not smokeRan then
-    finding, determined = 'smoke handler did not run', false
-  elseif not peer then
-    finding, determined = 'CancelEvent STOPPED the other resource handler', true
-  elseif peer.sawCanceled then
-    finding, determined = 'CancelEvent did NOT stop the other resource handler (it ran and saw WasEventCanceled=true)', true
-  else
-    finding, determined = 'peer ran before the cancelling handler; order inconclusive', false
-  end
-  VSMOKE.report('A4 CancelEvent cross-resource determined (' .. eventName .. ')', determined, {
-    smokeRan = smokeRan, peer = peer, finding = finding,
-  })
-end
-
-RegisterCommand('rpstack_vorp_assume4', function(source, args)
+RegisterCommand('rpstack_vorp_assume4', function(source)
   if not VSMOKE.consoleOnly(source) then return end
-  local src = VSMOKE.playerArg(args, 'rpstack_vorp_assume4 <playerSource>')
-  if not src then return end
-
-  if GetResourceState(VSMOKE.PEER_RESOURCE) ~= 'started' then
-    VSMOKE.report('A4 CancelEvent cross-resource', false, { error = VSMOKE.PEER_RESOURCE .. ' is not started' })
-    return
-  end
-
-  CreateThread(function()
-    cancelProbe.token = ('cancel-%d-%d'):format(os.time(), math.random(100000, 999999))
-    cancelProbe.src = src
-    cancelProbe.smokeRan, cancelProbe.peer = {}, {}
-
-    TriggerEvent(VSMOKE.LOCAL_CANCEL_PROBE, cancelProbe.token)
-    TriggerClientEvent(VSMOKE.NET_FIRE_CANCEL, src, cancelProbe.token)
-    Wait(3000)
-
-    evaluateCancel(VSMOKE.LOCAL_CANCEL_PROBE)
-    evaluateCancel(VSMOKE.NET_CANCEL_PROBE)
-    cancelProbe.token = nil
-  end)
+  VSMOKE.info('A4', 'RETIRED: CancelEvent shield approach rejected (ADR-008); no check runs', {})
 end, false)
 
 -- ── A5: same-tick check-then-removeCurrency interleaving ──────────────────────

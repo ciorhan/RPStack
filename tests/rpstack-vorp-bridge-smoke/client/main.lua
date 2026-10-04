@@ -8,9 +8,3 @@ RegisterNetEvent('rpstack:vorpsmoke:net:stateProbe', function(token)
   LocalPlayer.state:set('rpstackSmokeProbe', token, true)
   TriggerServerEvent('rpstack:vorpsmoke:net:stateProbeAck', token)
 end)
-
--- A4: fire the smoke-owned net event that two server resources handle.
-RegisterNetEvent('rpstack:vorpsmoke:net:fireCancelProbe', function(token)
-  if type(token) ~= 'string' or #token > 64 then return end
-  TriggerServerEvent('rpstack:vorpsmoke:net:cancelProbe', token)
-end)

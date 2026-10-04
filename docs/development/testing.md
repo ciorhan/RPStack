@@ -44,11 +44,11 @@ The peer depends on the smoke resource, so it starts after it; restarting the sm
 | Command | Purpose | Writes state? |
 | --- | --- | --- |
 | `rpstack_bridge_smoke <playerSource> [offlineCharacterId]` | N1 for an online player (compared with VORP), N1 invalid source, N2 online, N2 offline (if an offline `charidentifier` is given), N2 unknown id, N2 invalid id | No |
-| `rpstack_bridge_events_smoke [playerSource]` | Prints `characterLoaded`/`characterUnloaded` events observed since the smoke started. With a source, checks a Loaded event for that source and an Unloaded event for the same character from a previous source | No |
+| `rpstack_bridge_events_smoke [playerSource]` | Prints `characterLoaded`/`characterUnloaded` events observed since the smoke started. With a source, checks a Loaded event for that source's current character and an Unloaded event (any character) from a previous source of the same player, matched by Steam identifier | No |
 | `rpstack_vorp_assume1 <playerSource>` | A1: a fresh `getUsedCharacter` across the export boundary reflects a $1 change; also shows whether an old snapshot goes stale | $1 then restored |
 | `rpstack_vorp_assume2 <playerSource>` | A2: `GetCore().getUsers()[steamId].SaveUser()` is callable from another resource and writes the changed money to `characters.money`; then restores and saves again | $1 then restored; triggers VORP saves |
 | `rpstack_vorp_assume3 <playerSource>` | A3: whether a client write to its own `Player(src).state` (smoke key `rpstackSmokeProbe`) is accepted by the server. PASS means determined; the finding is printed as INFO | Smoke state key, cleared |
-| `rpstack_vorp_assume4 <playerSource>` | A4: whether `CancelEvent` in the smoke resource stops the peer resource's handler, for a local event and a client-fired net event (both smoke-owned). PASS means determined | No |
+| `rpstack_vorp_assume4` | A4: **retired**. The CancelEvent shield approach is rejected ([ADR-008](../architecture/adr/ADR-008-vorp-patch-policy.md)); the command only prints that it is retired | No |
 | `rpstack_vorp_assume5 <playerSource>` | A5: runs 100 same-tick check-then-`removeCurrency`/`addCurrency` pairs while a local and a peer ticker thread run; PASS if neither ticker advanced, every read matched, and money is restored | Net zero |
 
 `rpstack-vorp-bridge` supports an independent restart: it catches up through `isPersistenceReady()` and rebuilds its source-to-character map from VORP without emitting events.

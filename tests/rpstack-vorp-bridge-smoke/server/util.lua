@@ -9,10 +9,6 @@ VSMOKE = {}
 -- Smoke-owned names. Never VORP events or VORP state keys.
 VSMOKE.STATE_PROBE_KEY      = 'rpstackSmokeProbe'
 VSMOKE.NET_STATE_PROBE      = 'rpstack:vorpsmoke:net:stateProbe'
-VSMOKE.NET_FIRE_CANCEL      = 'rpstack:vorpsmoke:net:fireCancelProbe'
-VSMOKE.NET_CANCEL_PROBE     = 'rpstack:vorpsmoke:net:cancelProbe'
-VSMOKE.LOCAL_CANCEL_PROBE   = 'rpstack:vorpsmoke:cancelProbeLocal'
-VSMOKE.PEER_RESULT          = 'rpstack:vorpsmoke:peerResult'
 VSMOKE.PEER_RESOURCE        = 'rpstack-vorp-bridge-smoke-peer'
 
 function VSMOKE.report(check, passed, evidence)

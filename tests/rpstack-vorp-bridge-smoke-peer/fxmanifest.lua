@@ -6,10 +6,10 @@ rdr3_warning 'I acknowledge that this is a prerelease build of RedM, and I am aw
 
 name 'rpstack-vorp-bridge-smoke-peer'
 author 'RPStack'
-description 'Second resource for rpstack-vorp-bridge-smoke cross-resource checks (A4, A5)'
+description 'Second resource for rpstack-vorp-bridge-smoke cross-resource checks (A5)'
 version '0.0.1'
 
--- Starts after the smoke resource so the smoke handler registers first (A4).
+-- Starts after the smoke resource.
 dependency 'rpstack-vorp-bridge-smoke'
 
 server_script 'server/main.lua'
