@@ -11,25 +11,25 @@ Each resource runs in a completely isolated Lua environment. This has major cons
 
 ## Export syntax (verified in production)
 
-```lua
--- CORRECT: colon syntax
-exports['rpstack-persistence']:registerMigration(name, sql)
-exports['rpstack-identity']:getSession(src)
+`CLAUDE.md` is authoritative for export conventions. Summary:
 
--- WRONG: bracket syntax silently drops the first argument
+```lua
+-- Colon syntax supplies the export proxy receiver automatically
+exports['rpstack-persistence']:registerMigration(name, sql)
+
+-- Bracket syntax: pass the export proxy explicitly as the first argument.
+-- Works for simple and namespaced export names.
+local factions = exports['rpstack-factions']
+factions['createFaction'](factions, payload, cb)
+
+local identity = exports['rpstack-identity']
+identity['rpstack:identity:getActiveCharacter'](identity, src)
+
+-- WRONG: bracket syntax without the receiver; the proxy consumes the first argument
 exports['rpstack-persistence']['registerMigration'](name, sql)  -- sql arrives as nil
 ```
 
-Export names must be simple strings — no colons, no namespacing:
-
-```lua
--- CORRECT
-exports('registerMigration', function(name, sql) ... end)
-exports('getSession', function(src) ... end)
-
--- WRONG — causes argument shifting
-exports('rpstack:persistence:registerMigration', function(...) ... end)
-```
+Export names follow the convention of the owning resource. Persistence and factions use simple names; identity, economy, and the VORP bridge use namespaced names (`rpstack:<module>:<action>`). Do not rename an existing public export to fit a different convention. Namespaced names are not valid Lua identifiers, so they must use bracket syntax with the explicit receiver.
 
 ## String passing across exports
 
