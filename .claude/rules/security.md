@@ -7,6 +7,12 @@
 - Never use a value from a client payload as a DB key without validation.
 - Never expose internal account_id or DB row structure in client-facing events.
 
+## State bags
+
+- Player state bags (`Player(src).state`, including VORP's `Character`, `IsInSession`, and duty keys) are **client-writable**: a client's write to its own player state is accepted by the server (verified at runtime, `docs/integration/vorp-analysis.md` §11 A3).
+- Never use a state bag value for authorization, identity, ownership, or any server decision. Resolve those server-side (for example the active character via `rpstack-vorp-bridge`, staff via ACE).
+- State bags may be written by the server for client display only. Treat anything read back from them as client input.
+
 ## Identifiers
 
 - Primary identifier resolved server-side only: `license2 → license → fivem`.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Analysis only. Nothing in the server folder or the RPStack code was changed. Date: 2026-10-04.
+Analysis only. Nothing in the server folder or the RPStack code was changed. Date: 2026-10-04. Runtime verification results added in §11.
 
 ## Scope and conventions
 
@@ -15,6 +15,7 @@ Analysis only. Nothing in the server folder or the RPStack code was changed. Dat
   - Every API, event, and table was read from source or from the live schema.
   - Line numbers come from the files as deployed.
   - **[inferred]** marks a conclusion drawn from code behavior that was not exercised at runtime.
+  - **[verified]** / **[refuted]** mark a former inference that a live smoke run confirmed or disproved (see "Runtime verification"). **[inconclusive]** marks one the run could not decide.
 - **Database access:** two read-only operations:
   - `mariadb-dump --no-data` (schema only, written to a scratch folder outside both trees).
   - `SELECT COUNT(*)` style row counts.
@@ -359,7 +360,7 @@ Observations:
 6. **Active character, server-side.**
    - `exports.vorp_core:GetCore().getUser(src).getUsedCharacter.charIdentifier` (`apicontroller.lua:45-52`; `user.lua:125`).
    - Reverse lookup: `getUserByCharId(charid)` (online only, `apicontroller.lua:54-62`).
-   - Do **not** trust `Player(src).state.Character.CharId` (`user.lua:34-49`). It is a replicated player state bag, and clients may be able to write their own player state **[inferred; verify]**.
+   - Do **not** trust `Player(src).state.Character.CharId` (`user.lua:34-49`). It is a replicated player state bag, and clients can write their own player state **[verified]** (A3, H9).
 7. **Logout** happens only by disconnecting.
    - `playerDropped` → `savePlayer` (coords and full row) → state bags cleared (`loadusers.lua:18-42`, `:125-135`).
    - `_users[identifier]` is removed **6 s later** (`:58-62`).
@@ -438,6 +439,7 @@ Observations:
 | H6 | `vorp_police:server:hirePlayer` | `data.job`, `data.grade`, and `data.label` come from the client, and the target may be the caller. Any officer with `canHire` can set anyone, including themself, to any job at any grade. | `vorp_police/server/main.lua:140-161` |
 | H7 | `vorp_bank:withgold`, `depositcash`, `transfer` | Read-then-absolute-write with no lock. Concurrent events double-spend (gold withdraw has no `lastMoney` guard) or lose updates **[inferred race]**. | `vorp_banking/server/server.lua:203-208, 268-291, 156-170` |
 | H8 | `vorp_library:Server:DeleteEntity` | Deletes any networked entity by netId: other players' horses and wagons, store NPCs. | `vorp_lib/server/main/main.lua:2-8` |
+| H9 | Server reads of player state bags | Clients can write their own `Player(src).state` (A3 **[verified]**), so any server code that reads it for authority or identity is exploitable. `vorp_doorlocks` authorizes doors with per-character permissions by `Player(_source).state.Character.CharId`: a client that sets its own `Character.CharId` to an allowed id opens those doors. `vorp_billing` gates billing on the client-writable `isPoliceDuty` / `isMedicDuty` keys. `IsInSession` gates the periodic save (a client can opt out of autosaves, widening crash-rollback windows), paycheck, and door-permission updates. `PlayerIsInCharacterShops` skips coordinate saving. vorp_core's `SetState` reads the current `Character` table back from the bag and republishes it, so client-injected fields are re-replicated by the server. | `vorp_doorlocks/server/main.lua:61, 204`; `vorp_billing/config.lua:35`; `vorp_core/server/saveusers.lua:5`; `vorp_paycheck/server/main.lua:31`; `vorp_core/server/class/user.lua:311`; `vorp_core/server/class/character.lua:2-8` |
 
 ### Medium
 
@@ -516,13 +518,13 @@ Proposal: a single resource **`rpstack-vorp-bridge`**. It is the *only* RPStack 
    1. In one uninterrupted tick (no `Wait` or await between the steps): fetch a fresh `getUser(src).getUsedCharacter`, verify `charIdentifier == char_id` and `money >= amount`, then call `removeCurrency(0, amount)`. Set the journal to `char_debited`.
    2. Run `UPDATE … SET cash = cash + ? WHERE …` and set the journal to `committed`.
    3. On DB failure: if the character is still online (`getUserByCharId`), call `addCurrency(0, amount)` and set `compensated`. Otherwise set `needs_reconcile`.
-   - Server Lua runs cooperatively on one thread and export calls are synchronous, so step 1 cannot interleave with other handlers **[inferred; verify]**.
+   - Server Lua runs cooperatively on one thread and export calls are synchronous, so step 1 cannot interleave with other handlers **[verified]** (A5).
 3. **Withdraw (treasury → character).**
    1. Conditional `UPDATE … SET cash = cash - ? WHERE … AND cash >= ?` and require `affected == 1`.
    2. In one tick: re-verify the character is online and matches, then call `addCurrency(0, amount)` and set `committed`.
    3. If the character went offline, refund the treasury and set `compensated`.
 4. **Durability gap.** VORP may lose up to `savePlayersTimer` minutes of character money on a crash (`config.lua:71`, `saveusers.lua:1-12`), which would make a committed deposit a mint. Options, in order of preference:
-   - (a) Force a save after each saga through `getUsers()[steamId].SaveUser()`. `getUsers` returns the raw `_users` (`apicontroller.lua:41-43`) and `SaveUser` exists on it (`user.lua:309-322`). **[inferred: callable across the export boundary — must be verified at runtime]**.
+   - (a) Force a save after each saga through `getUsers()[steamId].SaveUser()`. `getUsers` returns the raw `_users` (`apicontroller.lua:41-43`) and `SaveUser` exists on it (`user.lua:309-322`). Callable across the export boundary and persists to the DB **[verified]** (A2).
    - (b) Lower `savePlayersTimer` (config edit).
    - (c) A startup reconciler for `char_debited` / `needs_reconcile` rows.
 5. **Amounts:** positive integers only (`isPositiveInteger` already exists in `resources/rpstack-factions/server/treasury.lua:24-26`). VORP's `double(11,2)` stores them exactly. Gold and rol are out of scope until asked for.
@@ -586,7 +588,8 @@ Client:
    - vorp_inventory: amount sign checks (C2, C3, H3, M9), name trust in `MoveToCustom` (C4), weapon ownership (H4), pickup distance (M3).
    - vorp_character: `saveCharacter`, `PayToShop`, comp changes (H5, C6, M4).
    - `vorp_lib` DeleteEntity (H8).
-   - A "shield" resource cannot block another resource's net handler: `CancelEvent` does not stop other resources' handlers from running **[inferred; verify]**.
+   - `vorp_doorlocks`: authorize per-character doors from `GetCore().getUser(src).getUsedCharacter.charIdentifier`, not `Player(src).state.Character.CharId` (H9).
+   - A "shield" resource that calls `CancelEvent` to block VORP's net handlers is **rejected** ([ADR-008](../architecture/adr/ADR-008-vorp-patch-policy.md)). Whether `CancelEvent` stops another resource's handler is **[inconclusive]** (A4: the other resource's handler ran first). Even if it did, the protection would depend on handler order across resources, which RPStack does not control. Security fixes go through the patch series.
 2. **Resources better disabled and replaced than patched:** `vorp_stores` (C1), `vorp_banking` (C5, H7), the payment paths in `vorp_barbershop` / `vorp_weaponsv2` / `vorp_billing` (M11), `vorp_admin` (M1, M2) if txAdmin is enough for staff.
 3. **Config edits:**
    - `vorp_core/config/config.lua`: `initMoney`, `savePlayersTimer`, `MaxCharacters`, `Whitelist`.
@@ -606,17 +609,36 @@ Client:
 
 ---
 
+## 11. Runtime verification
+
+One live run of `tests/rpstack-vorp-bridge-smoke` on this server (build 1491, VORP Core 3.3). Commands and method are in `docs/development/testing.md`.
+
+| Check | Result | What it settles |
+| --- | --- | --- |
+| N1 `getActiveCharacter` (online, invalid source) | PASS | Bridge reads the active character fresh from VORP. |
+| N2 `getCharacterById` (online, offline, unknown, invalid) | PASS | Online path via `getUserByCharId` and the read-only offline `SELECT` both work. |
+| N3 load/unload events | Observed: character 1 loaded on source 1, unloaded on source 1, character 2 loaded on source 2 | Lifecycle events fire from `vorp:SelectedCharacter` and `playerDropped`, including a reconnect with a different character. The smoke's unload check was corrected to match the previous source of the same player regardless of character id. |
+| A1 fresh `getUsedCharacter` | PASS. Fresh read reflected the change; the old snapshot stayed stale (200 vs 201) | **[verified]** Fresh reads work across the export boundary. Snapshots must never be cached (§3.1). |
+| A2 `getUsers()[steamId].SaveUser()` | PASS. Callable from another resource; the changed money persisted to `characters.money` and the restore persisted | **[verified]** Forced saves are available for the N5 saga (§8 N5 step 4). |
+| A3 client write to own `Player(src).state` | Accepted by the server | **[verified]** Player state bags are client-writable. They must never be used for authorization or identity (H9; `.claude/rules/security.md`; ADR-011). |
+| A4 `CancelEvent` across resources | Inconclusive: the other resource's handler ran before the cancelling handler | **[inconclusive]** The question is moot: the shield approach is rejected because any result would depend on handler order (§10; ADR-008). A4 is retired in the smoke resource. |
+| A5 same-tick check-then-`removeCurrency` | PASS. 100 iterations, 0 mismatches, local and peer ticks unchanged | **[verified]** Check-then-remove in one tick cannot be interleaved by other handlers or resources (§8 N5 step 2). |
+
+Not covered by the run: the "different character on the same source without reconnecting" path in N3 (only reachable in VORP through repeated character creation, H5).
+
+---
+
 ## Top 5 risks
 
 1. **VORP as installed lets an ordinary client mint money and items** (C1–C6, H3–H5). This directly violates RPStack's first vision KPI (V10). Any RPStack economy-adjacent feature, such as faction treasuries, inherits a currency that can be inflated at will. Mitigating it requires patching or disabling VORP resources, which partly contradicts "build without editing VORP".
 2. **Patch-maintenance drift.** Securing the base needs edits in vorp_core, vorp_inventory, vorp_character, and vorp_lib. Without pinning and a patch series, a VORP update silently re-opens the exploits and erases config.
-3. **No atomic or durable money path.** Money is in-memory floats flushed every 10 minutes, items are write-through, and there is no ledger. Cross-store "atomic" treasury transfers can only be a saga. A crash can still mint unless forced saves work (unverified, §8 N5 step 4).
+3. **No atomic or durable money path.** Money is in-memory floats flushed every 10 minutes, items are write-through, and there is no ledger. Cross-store "atomic" treasury transfers can only be a saga. Forced saves through `SaveUser` work from another resource (A2 **[verified]**), so the saga can close most of the crash window; it remains a saga, not a transaction (§8 N5 step 4).
 4. **Identity and authority mismatch.**
    - Steam-only, string-keyed accounts (vs ADR-001).
    - Automatic admin for the first joiner.
    - Two independent admin systems (ACE vs `users.group`), where any moderator can grant `admin` (M2).
    - RPStack permission checks must pick one source of truth.
-5. **Untrustworthy VORP channels.** The server→client callback registry can be hijacked or spoofed (H1, H2), player state bags may be client-writable **[inferred]**, and `vorp_NewCharacter` / `vorp:ImDead` are client-driven. RPStack modules must not treat any of these as proof of anything.
+5. **Untrustworthy VORP channels.** The server→client callback registry can be hijacked or spoofed (H1, H2), player state bags are client-writable **[verified]** (A3; exploitable in VORP's own door locks, H9), and `vorp_NewCharacter` / `vorp:ImDead` are client-driven. RPStack modules must not treat any of these as proof of anything.
    - Related operational exposure: secrets in `server.cfg` and a public listing (`sv_maxclients 48`, tags set) while the critical exploits are live.
 
 ## Recommended first implementation step
@@ -626,14 +648,14 @@ Client:
 **First implementation step:** create `rpstack-vorp-bridge` with **identity only**:
 
 - `getActiveCharacter(src)`, `getCharacterById(id, cb)`, and `characterLoaded` / `characterUnloaded` events (§8 N1–N3).
-- A guarded smoke resource that verifies the **[inferred]** runtime assumptions this design depends on:
-  1. Fresh `getUsedCharacter` closures work across the export boundary.
-  2. `getUsers()[id].SaveUser()` is callable from another resource.
-  3. Client writes to `Player(src).state` are or aren't accepted.
-  4. `CancelEvent` does or doesn't stop other resources' net handlers.
-  5. Same-tick check-and-`removeCurrency` cannot interleave.
+- A guarded smoke resource that verifies the runtime assumptions this design depends on:
+  1. Fresh `getUsedCharacter` closures work across the export boundary. **[verified]**
+  2. `getUsers()[id].SaveUser()` is callable from another resource. **[verified]**
+  3. Client writes to `Player(src).state` are or aren't accepted. **[verified: accepted]**
+  4. `CancelEvent` does or doesn't stop other resources' net handlers. **[inconclusive; approach rejected]**
+  5. Same-tick check-and-`removeCurrency` cannot interleave. **[verified]**
 
-This unblocks rebasing factions membership and ranks onto VORP characters with no money path. Its results decide whether the N5 treasury saga is viable as specified.
+This step is now built (`resources/rpstack-vorp-bridge`, `tests/rpstack-vorp-bridge-smoke`) and the results are in "Runtime verification". They confirm the N5 treasury saga is viable as specified.
 
 ## Open questions for me
 
